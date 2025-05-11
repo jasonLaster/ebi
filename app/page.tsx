@@ -51,16 +51,16 @@ interface IndividualPerformance {
   ebi: PerformanceData;
   vti: PerformanceData;
   iwv: PerformanceData;
-  iwn?: PerformanceData; // Optional based on original API output
-  vtv?: PerformanceData; // Optional based on original API output
+  iwn: PerformanceData; // No longer optional
+  vtv: PerformanceData; // No longer optional
 }
 
 interface HistoricalPrices {
   ebi: PerformanceEntry[] | PerformanceError;
   vti: PerformanceEntry[] | PerformanceError;
   iwv: PerformanceEntry[] | PerformanceError;
-  iwn?: PerformanceEntry[] | PerformanceError; // Optional
-  vtv?: PerformanceEntry[] | PerformanceError; // Optional
+  iwn: PerformanceEntry[] | PerformanceError; // No longer optional
+  vtv: PerformanceEntry[] | PerformanceError; // No longer optional
 }
 
 interface ApiResponse {
@@ -79,13 +79,19 @@ interface CombinedChartData {
   EBI_norm?: number;
   VTI_norm?: number;
   IWV_norm?: number;
-  delta?: number; // Delta between EBI and IWV
+  IWN_norm?: number; // Added for IWN
+  VTV_norm?: number; // Added for VTV
+  EBI_delta_IWV?: number; // Delta EBI vs IWV
+  IWN_delta_IWV?: number; // Delta IWN vs IWV
+  VTV_delta_IWV?: number; // Delta VTV vs IWV
 }
 
 interface ProcessedData {
   combinedData: CombinedChartData[];
   yAxisMin: number;
   yAxisMax: number;
+  yAxisMinDelta: number; // Added for delta chart y-axis
+  yAxisMaxDelta: number; // Added for delta chart y-axis
   chartReady: boolean;
 }
 
@@ -166,76 +172,150 @@ export default function ETFDashboard() {
     const ebiHist = historicalPrices.ebi;
     const vtiHist = historicalPrices.vti;
     const iwvHist = historicalPrices.iwv;
+    const iwnHist = historicalPrices.iwn; // Added
+    const vtvHist = historicalPrices.vtv; // Added
 
     const ebiPerf = individualPerformance.ebi;
     const vtiPerf = individualPerformance.vti;
     const iwvPerf = individualPerformance.iwv;
+    const iwnPerf = individualPerformance.iwn; // Added
+    const vtvPerf = individualPerformance.vtv; // Added
 
     let chartReady = false;
     let combinedData: CombinedChartData[] = [];
 
-    if (
-      Array.isArray(ebiHist) &&
-      ebiPerf &&
-      typeof ebiPerf.startPrice === "number"
-    ) {
-      chartReady = true; // At least EBI data is available for the chart.
-      combinedData = ebiHist.map((item, index) => {
-        const ebiNorm = (item.close / (ebiPerf.startPrice as number)) * 100;
+    // Determine the primary array for dates (e.g., ebiHist or iwvHist if ebiHist is missing)
+    let primaryDateSource: PerformanceEntry[] | undefined;
+    if (Array.isArray(ebiHist) && ebiHist.length > 0) {
+      primaryDateSource = ebiHist;
+    } else if (Array.isArray(iwvHist) && iwvHist.length > 0) {
+      primaryDateSource = iwvHist;
+    } else if (Array.isArray(iwnHist) && iwnHist.length > 0) {
+      primaryDateSource = iwnHist;
+    } else if (Array.isArray(vtvHist) && vtvHist.length > 0) {
+      primaryDateSource = vtvHist;
+    } else if (Array.isArray(vtiHist) && vtiHist.length > 0) {
+      primaryDateSource = vtiHist;
+    }
+
+    if (primaryDateSource) {
+      chartReady = true;
+      combinedData = primaryDateSource.map((dateEntry) => {
+        const currentDate = dateEntry.date;
+
+        let ebiNorm: number | undefined = undefined;
         let vtiNorm: number | undefined = undefined;
         let iwvNorm: number | undefined = undefined;
-        let delta: number | undefined = undefined;
+        let iwnNorm: number | undefined = undefined;
+        let vtvNorm: number | undefined = undefined;
+
+        let ebiDeltaIwv: number | undefined = undefined;
+        let iwnDeltaIwv: number | undefined = undefined;
+        let vtvDeltaIwv: number | undefined = undefined;
+
+        if (
+          Array.isArray(ebiHist) &&
+          ebiPerf &&
+          typeof ebiPerf.startPrice === "number" &&
+          ebiPerf.startPrice !== 0
+        ) {
+          const point = ebiHist.find((d) => d.date === currentDate);
+          if (point && typeof point.close === "number") {
+            ebiNorm = (point.close / ebiPerf.startPrice) * 100;
+          } else {
+            ebiNorm = undefined;
+          }
+        } else {
+          ebiNorm = undefined;
+        }
 
         if (
           Array.isArray(vtiHist) &&
           vtiPerf &&
           typeof vtiPerf.startPrice === "number" &&
-          vtiHist[index]
+          vtiPerf.startPrice !== 0
         ) {
-          vtiNorm =
-            (vtiHist[index].close / (vtiPerf.startPrice as number)) * 100;
+          const point = vtiHist.find((d) => d.date === currentDate);
+          if (point && typeof point.close === "number") {
+            vtiNorm = (point.close / vtiPerf.startPrice) * 100;
+          } else {
+            vtiNorm = undefined;
+          }
+        } else {
+          vtiNorm = undefined;
         }
 
         if (
           Array.isArray(iwvHist) &&
           iwvPerf &&
           typeof iwvPerf.startPrice === "number" &&
-          iwvHist[index]
+          iwvPerf.startPrice !== 0
         ) {
-          iwvNorm =
-            (iwvHist[index].close / (iwvPerf.startPrice as number)) * 100;
+          const point = iwvHist.find((d) => d.date === currentDate);
+          if (point && typeof point.close === "number") {
+            iwvNorm = (point.close / iwvPerf.startPrice) * 100;
+          } else {
+            iwvNorm = undefined;
+          }
+        } else {
+          iwvNorm = undefined;
+        }
+
+        if (
+          Array.isArray(iwnHist) &&
+          iwnPerf &&
+          typeof iwnPerf.startPrice === "number" &&
+          iwnPerf.startPrice !== 0
+        ) {
+          const point = iwnHist.find((d) => d.date === currentDate);
+          if (point && typeof point.close === "number") {
+            iwnNorm = (point.close / iwnPerf.startPrice) * 100;
+          } else {
+            iwnNorm = undefined;
+          }
+        } else {
+          iwnNorm = undefined;
+        }
+
+        if (
+          Array.isArray(vtvHist) &&
+          vtvPerf &&
+          typeof vtvPerf.startPrice === "number" &&
+          vtvPerf.startPrice !== 0
+        ) {
+          const point = vtvHist.find((d) => d.date === currentDate);
+          if (point && typeof point.close === "number") {
+            vtvNorm = (point.close / vtvPerf.startPrice) * 100;
+          } else {
+            vtvNorm = undefined;
+          }
+        } else {
+          vtvNorm = undefined;
         }
 
         if (typeof ebiNorm === "number" && typeof iwvNorm === "number") {
-          delta = ebiNorm - iwvNorm;
+          ebiDeltaIwv = ebiNorm - iwvNorm;
+        }
+        if (typeof iwnNorm === "number" && typeof iwvNorm === "number") {
+          iwnDeltaIwv = iwnNorm - iwvNorm;
+        }
+        if (typeof vtvNorm === "number" && typeof iwvNorm === "number") {
+          vtvDeltaIwv = vtvNorm - iwvNorm;
         }
 
         const result: CombinedChartData = {
-          date: item.date,
-          EBI_norm: ebiNorm,
+          date: currentDate,
         };
+        if (ebiNorm !== undefined) result.EBI_norm = ebiNorm;
         if (vtiNorm !== undefined) result.VTI_norm = vtiNorm;
         if (iwvNorm !== undefined) result.IWV_norm = iwvNorm;
-        if (delta !== undefined) result.delta = delta;
+        if (iwnNorm !== undefined) result.IWN_norm = iwnNorm;
+        if (vtvNorm !== undefined) result.VTV_norm = vtvNorm;
+        if (ebiDeltaIwv !== undefined) result.EBI_delta_IWV = ebiDeltaIwv;
+        if (iwnDeltaIwv !== undefined) result.IWN_delta_IWV = iwnDeltaIwv;
+        if (vtvDeltaIwv !== undefined) result.VTV_delta_IWV = vtvDeltaIwv;
         return result;
       });
-    } else {
-      // Fallback if EBI historical data or start price isn't available.
-      // Try to build based on IWV or VTI if they exist, for completeness, though EBI is primary.
-      // This part can be expanded if other series should drive the date range.
-      // For now, if EBI isn't there, we assume no primary series for chart x-axis.
-      if (
-        Array.isArray(iwvHist) &&
-        iwvPerf &&
-        typeof iwvPerf.startPrice === "number"
-      ) {
-        chartReady = true;
-        combinedData = iwvHist.map((item, index) => {
-          const iwvNorm = (item.close / (iwvPerf.startPrice as number)) * 100;
-          // Potentially add VTI if available here too
-          return { date: item.date, IWV_norm: iwvNorm };
-        });
-      }
     }
 
     if (!chartReady || combinedData.length === 0) {
@@ -243,12 +323,20 @@ export default function ETFDashboard() {
         combinedData: [],
         yAxisMin: 80,
         yAxisMax: 120,
+        yAxisMinDelta: -10,
+        yAxisMaxDelta: 10,
         chartReady: false,
       };
     }
 
     const allValues = combinedData
-      .flatMap((item) => [item.EBI_norm, item.VTI_norm, item.IWV_norm])
+      .flatMap((item) => [
+        item.EBI_norm,
+        item.VTI_norm,
+        item.IWV_norm,
+        item.IWN_norm,
+        item.VTV_norm,
+      ])
       .filter((v): v is number => typeof v === "number" && !isNaN(v));
 
     const minValue =
@@ -257,11 +345,62 @@ export default function ETFDashboard() {
       allValues.length > 0 ? Math.ceil(Math.max(...allValues)) : 110;
 
     const range = Math.max(100 - minValue, maxValue - 100);
-    // Ensure yAxisMin and yAxisMax are reasonable, provide defaults if range is 0
     const yAxisMin = range > 0 ? Math.max(80, 100 - range - 5) : 80;
     const yAxisMax = range > 0 ? Math.min(120, 100 + range + 5) : 120;
 
-    return { combinedData, yAxisMin, yAxisMax, chartReady };
+    const allDeltaValues = combinedData
+      .flatMap((item) => [
+        item.EBI_delta_IWV,
+        item.IWN_delta_IWV,
+        item.VTV_delta_IWV,
+      ])
+      .filter((v): v is number => typeof v === "number" && !isNaN(v));
+
+    let yAxisMinDelta = -10;
+    let yAxisMaxDelta = 10;
+
+    if (allDeltaValues.length > 0) {
+      const minDeltaVal = Math.floor(Math.min(...allDeltaValues));
+      const maxDeltaVal = Math.ceil(Math.max(...allDeltaValues));
+      // Calculate range based on deviation from 0, ensuring symmetry if possible
+      const deltaRangeMagnitude = Math.max(
+        Math.abs(minDeltaVal),
+        Math.abs(maxDeltaVal)
+      );
+      yAxisMinDelta = Math.max(-25, 0 - deltaRangeMagnitude - 5);
+      yAxisMaxDelta = Math.min(25, 0 + deltaRangeMagnitude + 5);
+
+      if (
+        yAxisMinDelta === 0 &&
+        yAxisMaxDelta === 0 &&
+        allDeltaValues.every((v) => v === 0)
+      ) {
+        yAxisMinDelta = -5; // Default small range if all deltas are exactly 0
+        yAxisMaxDelta = 5;
+      } else if (yAxisMinDelta >= yAxisMaxDelta) {
+        // Ensure min is less than max
+        // If calculation leads to min >= max (e.g. all positive/negative small deltas)
+        // provide a sensible range around the values or a default.
+        if (maxDeltaVal <= 2 && minDeltaVal >= -2) {
+          // If values are very close to zero
+          yAxisMinDelta = -5;
+          yAxisMaxDelta = 5;
+        } else {
+          // else, base on actual min/max with padding
+          yAxisMinDelta = minDeltaVal - 2;
+          yAxisMaxDelta = maxDeltaVal + 2;
+        }
+      }
+    }
+
+    return {
+      combinedData,
+      yAxisMin,
+      yAxisMax,
+      yAxisMinDelta,
+      yAxisMaxDelta,
+      chartReady,
+    };
   }, [apiData]);
 
   if (loading) {
@@ -288,25 +427,60 @@ export default function ETFDashboard() {
 
   const { dateRange, individualPerformance, performanceDeltas, deltaNote } =
     apiData;
-  const { combinedData, yAxisMin, yAxisMax, chartReady } = processedData;
+  const {
+    combinedData,
+    yAxisMin,
+    yAxisMax,
+    yAxisMinDelta,
+    yAxisMaxDelta,
+    chartReady,
+  } = processedData;
 
   const ebiPerfData = individualPerformance.ebi;
   const vtiPerfData = individualPerformance.vti;
   const iwvPerfData = individualPerformance.iwv;
+  const iwnPerfData = individualPerformance.iwn;
+  const vtvPerfData = individualPerformance.vtv;
 
-  // Find the min and max values for the chart to set appropriate y-axis domain
-  // const allValues = combinedData.flatMap((item) => [ // Moved to useMemo
-  // item.EBI_norm,
-  // item.VTI_norm,
-  // item.IWV_norm,
-  // ]);
-  // const minValue = Math.floor(Math.min(...allValues)); // Moved to useMemo
-  // const maxValue = Math.ceil(Math.max(...allValues)); // Moved to useMemo
+  // Data for the new table
+  const symbolDisplayData = [
+    {
+      symbol: "EBI",
+      name: "iShares ESG Aware MSCI EM ETF",
+      perfData: ebiPerfData,
+      deltaKey: "ebi_iwv",
+      description: "iShares ESG Aware MSCI EM ETF",
+    },
+    {
+      symbol: "IWN",
+      name: "iShares Russell 2000 Value ETF",
+      perfData: iwnPerfData,
+      deltaKey: "iwn_iwv",
+      description: "iShares Russell 2000 Value ETF",
+    },
+    {
+      symbol: "VTV",
+      name: "Vanguard Value ETF",
+      perfData: vtvPerfData,
+      deltaKey: "vtv_iwv",
+      description: "Vanguard Value ETF",
+    },
+    // VTI is listed after the benchmark
+    {
+      symbol: "VTI",
+      name: "Vanguard Total Stock Market ETF",
+      perfData: vtiPerfData,
+      deltaKey: "vti_iwv",
+      description: "Vanguard Total Stock Market ETF",
+    },
+  ];
 
-  // Calculate the range to ensure 100% is in the middle
-  // const range = Math.max(100 - minValue, maxValue - 100); // Moved to useMemo
-  // const yAxisMin = Math.max(80, 100 - range - 5); // Add some padding // Moved to useMemo
-  // const yAxisMax = Math.min(120, 100 + range + 5); // Add some padding // Moved to useMemo
+  const benchmarkSymbolData = {
+    symbol: "IWV",
+    name: "iShares Russell 3000 ETF",
+    perfData: iwvPerfData,
+    description: "iShares Russell 3000 ETF (Benchmark)",
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -315,163 +489,204 @@ export default function ETFDashboard() {
         {formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}
       </p>
 
-      {/* Performance Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* EBI Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold">EBI</CardTitle>
-            <CardDescription>iShares ESG Aware MSCI EM ETF</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {ebiPerfData && !ebiPerfData.error ? (
-              <div className="flex flex-col space-y-4">
-                <div>
-                  <p className="text-sm text-gray-500">Performance</p>
-                  <p
-                    className={`text-xl font-medium flex items-center ${
-                      ebiPerfData.performance &&
-                      Number.parseFloat(ebiPerfData.performance) < 0
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {ebiPerfData.performance &&
-                    Number.parseFloat(ebiPerfData.performance) < 0 ? (
-                      <ArrowDownIcon className="mr-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpIcon className="mr-1 h-4 w-4" />
-                    )}
-                    {ebiPerfData.performance || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">vs IWV (Benchmark)</p>
-                  <p
-                    className={`text-xl font-medium flex items-center ${
-                      typeof performanceDeltas.ebi_iwv === "number" &&
-                      performanceDeltas.ebi_iwv < 0
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {typeof performanceDeltas.ebi_iwv === "number" &&
-                    performanceDeltas.ebi_iwv < 0 ? (
-                      <ArrowDownIcon className="mr-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpIcon className="mr-1 h-4 w-4" />
-                    )}
-                    {typeof performanceDeltas.ebi_iwv === "number"
-                      ? `${performanceDeltas.ebi_iwv.toFixed(2)}%`
-                      : performanceDeltas.ebi_iwv || "N/A"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-red-500">
-                {ebiPerfData?.error || "Data unavailable for EBI"}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Performance Summary Table - REPLACES THE CARDS */}
+      <div className="mb-8 overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
+          <thead className="bg-gray-50">
+            <tr>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                Symbol
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell sm:px-6"
+              >
+                Name
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                Performance
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                Delta vs IWV
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {symbolDisplayData.slice(0, 3).map((item) => (
+              <tr key={item.symbol} className="hover:bg-gray-50">
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
+                  <div className="font-bold">{item.symbol}</div>
+                  <div className="text-xs text-gray-500 sm:hidden">
+                    {item.name}
+                  </div>
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
+                  {item.description}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  {item.perfData && !item.perfData.error ? (
+                    <span
+                      className={`flex items-center font-semibold ${
+                        item.perfData.performance &&
+                        Number.parseFloat(item.perfData.performance) < 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {item.perfData.performance &&
+                      Number.parseFloat(item.perfData.performance) < 0 ? (
+                        <ArrowDownIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      )}
+                      {item.perfData.performance || "N/A"}
+                    </span>
+                  ) : (
+                    <span className="text-red-500">
+                      {item.perfData?.error || "Data Unavailable"}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  {performanceDeltas &&
+                  item.deltaKey &&
+                  performanceDeltas[item.deltaKey] !== undefined &&
+                  typeof performanceDeltas[item.deltaKey] === "number" ? (
+                    <span
+                      className={`flex items-center font-semibold ${
+                        (performanceDeltas[item.deltaKey] as number) < 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {(performanceDeltas[item.deltaKey] as number) < 0 ? (
+                        <ArrowDownIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      )}
+                      {(performanceDeltas[item.deltaKey] as number).toFixed(2)}%
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
+              </tr>
+            ))}
 
-        {/* VTI Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold">VTI</CardTitle>
-            <CardDescription>Vanguard Total Stock Market ETF</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {vtiPerfData && !vtiPerfData.error ? (
-              <div className="flex flex-col space-y-4">
-                <div>
-                  <p className="text-sm text-gray-500">Performance</p>
-                  <p
-                    className={`text-xl font-medium flex items-center ${
-                      vtiPerfData.performance &&
-                      Number.parseFloat(vtiPerfData.performance) < 0
+            {/* Separator Row for IWV (Baseline) */}
+            <tr className="bg-gray-50">
+              <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800 sm:px-6">
+                {benchmarkSymbolData.symbol}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell sm:px-6">
+                {benchmarkSymbolData.description}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold sm:px-6">
+                {benchmarkSymbolData.perfData &&
+                !benchmarkSymbolData.perfData.error ? (
+                  <span
+                    className={`flex items-center ${
+                      benchmarkSymbolData.perfData.performance &&
+                      Number.parseFloat(
+                        benchmarkSymbolData.perfData.performance
+                      ) < 0
                         ? "text-red-600"
                         : "text-green-600"
                     }`}
                   >
-                    {vtiPerfData.performance &&
-                    Number.parseFloat(vtiPerfData.performance) < 0 ? (
-                      <ArrowDownIcon className="mr-1 h-4 w-4" />
+                    {benchmarkSymbolData.perfData.performance &&
+                    Number.parseFloat(
+                      benchmarkSymbolData.perfData.performance
+                    ) < 0 ? (
+                      <ArrowDownIcon className="mr-1 h-4 w-4 flex-shrink-0" />
                     ) : (
-                      <ArrowUpIcon className="mr-1 h-4 w-4" />
+                      <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
                     )}
-                    {vtiPerfData.performance || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">vs IWV (Benchmark)</p>
-                  <p
-                    className={`text-xl font-medium flex items-center ${
-                      typeof performanceDeltas.vti_iwv === "number" &&
-                      performanceDeltas.vti_iwv < 0
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {typeof performanceDeltas.vti_iwv === "number" &&
-                    performanceDeltas.vti_iwv < 0 ? (
-                      <ArrowDownIcon className="mr-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpIcon className="mr-1 h-4 w-4" />
-                    )}
-                    {typeof performanceDeltas.vti_iwv === "number"
-                      ? `${performanceDeltas.vti_iwv.toFixed(2)}%`
-                      : performanceDeltas.vti_iwv || "N/A"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-red-500">
-                {vtiPerfData?.error || "Data unavailable for VTI"}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                    {benchmarkSymbolData.perfData.performance || "N/A"}
+                  </span>
+                ) : (
+                  <span className="text-red-500">
+                    {benchmarkSymbolData.perfData?.error || "Data Unavailable"}
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 sm:px-6">
+                Baseline
+              </td>
+            </tr>
 
-        {/* IWV Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold">IWV</CardTitle>
-            <CardDescription>
-              iShares Russell 3000 ETF (Benchmark)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {iwvPerfData && !iwvPerfData.error ? (
-              <div className="flex flex-col space-y-4">
-                <div>
-                  <p className="text-sm text-gray-500">Performance</p>
-                  <p
-                    className={`text-xl font-medium flex items-center ${
-                      iwvPerfData.performance &&
-                      Number.parseFloat(iwvPerfData.performance) < 0
-                        ? "text-red-600"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {iwvPerfData.performance &&
-                    Number.parseFloat(iwvPerfData.performance) < 0 ? (
-                      <ArrowDownIcon className="mr-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpIcon className="mr-1 h-4 w-4" />
-                    )}
-                    {iwvPerfData.performance || "N/A"}
-                  </p>
-                </div>
-                {/* IWV is the benchmark, so no "vs IWV" here */}
-              </div>
-            ) : (
-              <p className="text-red-500">
-                {iwvPerfData?.error || "Data unavailable for IWV"}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            {/* VTI Row (after separator) */}
+            {symbolDisplayData.slice(3).map((item) => (
+              <tr key={item.symbol} className="hover:bg-gray-50">
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
+                  <div className="font-bold">{item.symbol}</div>
+                  <div className="text-xs text-gray-500 sm:hidden">
+                    {item.name}
+                  </div>
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
+                  {item.description}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  {item.perfData && !item.perfData.error ? (
+                    <span
+                      className={`flex items-center font-semibold ${
+                        item.perfData.performance &&
+                        Number.parseFloat(item.perfData.performance) < 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {item.perfData.performance &&
+                      Number.parseFloat(item.perfData.performance) < 0 ? (
+                        <ArrowDownIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      )}
+                      {item.perfData.performance || "N/A"}
+                    </span>
+                  ) : (
+                    <span className="text-red-500">
+                      {item.perfData?.error || "Data Unavailable"}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  {performanceDeltas &&
+                  item.deltaKey &&
+                  performanceDeltas[item.deltaKey] !== undefined &&
+                  typeof performanceDeltas[item.deltaKey] === "number" ? (
+                    <span
+                      className={`flex items-center font-semibold ${
+                        (performanceDeltas[item.deltaKey] as number) < 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {(performanceDeltas[item.deltaKey] as number) < 0 ? (
+                        <ArrowDownIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
+                      )}
+                      {(performanceDeltas[item.deltaKey] as number).toFixed(2)}%
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Charts Section */}
@@ -479,7 +694,7 @@ export default function ETFDashboard() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Percentage Change</CardTitle>
+              <CardTitle>Performance Chart</CardTitle>
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
@@ -487,8 +702,8 @@ export default function ETFDashboard() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="max-w-xs">
-                      This chart shows the percentage change over the selected
-                      time period, normalized to 100% at the start date.
+                      Normalized percentage change from start date (top chart).
+                      Delta percentage change against IWV (bottom chart).
                     </p>
                   </TooltipContent>
                 </UITooltip>
@@ -502,14 +717,13 @@ export default function ETFDashboard() {
                 missing historical price data for key ETFs.
               </div>
             ) : (
-              <Tabs defaultValue="EBI">
+              <Tabs defaultValue="percentageChange">
                 <TabsList className="mb-4">
-                  <TabsTrigger value="ebi">EBI</TabsTrigger>
-                  <TabsTrigger value="iwv">IWV</TabsTrigger>
-                  <TabsTrigger value="delta">EBI vs IWV</TabsTrigger>
+                  <TabsTrigger value="percentageChange">% Change</TabsTrigger>
+                  <TabsTrigger value="percentageDelta">% Delta</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="all" className="h-[500px]">
+                <TabsContent value="percentageChange" className="h-[500px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={combinedData}
@@ -570,19 +784,52 @@ export default function ETFDashboard() {
                             stopOpacity={0}
                           />
                         </linearGradient>
+                        <linearGradient
+                          id="colorIWN"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#ff7300"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#ff7300"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                        <linearGradient
+                          id="colorVTV"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#387908"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#387908"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
                         dataKey="date"
                         tickFormatter={formatDate}
                         tick={{ fontSize: 12 }}
-                        // interval="preserveStartEnd" // To ensure first and last ticks are shown
-                        // minTickGap={30} // Adjust for density
                       />
                       <YAxis
                         domain={[yAxisMin, yAxisMax]}
-                        tickFormatter={(value) => `${value.toFixed(0)}%`} // Simpler tick format
-                        // ticks={[85, 90, 95, 100, 105, 110, 115]} // Keep or make dynamic
+                        tickFormatter={(value) => `${value.toFixed(0)}%`}
                         allowDataOverflow={true}
                       />
                       <Tooltip content={<CustomTooltip />} />
@@ -604,6 +851,54 @@ export default function ETFDashboard() {
                             name="EBI"
                             dataKey="EBI_norm"
                             stroke="#8884d8"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                            connectNulls={true}
+                          />
+                        </>
+                      )}
+                      {combinedData[0]?.IWN_norm !== undefined && (
+                        <>
+                          <Area
+                            type="monotone"
+                            name="IWN"
+                            dataKey="IWN_norm"
+                            stroke="#ff7300"
+                            fillOpacity={1}
+                            fill="url(#colorIWN)"
+                            strokeWidth={0}
+                            connectNulls={true}
+                          />
+                          <Line
+                            type="monotone"
+                            name="IWN"
+                            dataKey="IWN_norm"
+                            stroke="#ff7300"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                            connectNulls={true}
+                          />
+                        </>
+                      )}
+                      {combinedData[0]?.VTV_norm !== undefined && (
+                        <>
+                          <Area
+                            type="monotone"
+                            name="VTV"
+                            dataKey="VTV_norm"
+                            stroke="#387908"
+                            fillOpacity={1}
+                            fill="url(#colorVTV)"
+                            strokeWidth={0}
+                            connectNulls={true}
+                          />
+                          <Line
+                            type="monotone"
+                            name="VTV"
+                            dataKey="VTV_norm"
+                            stroke="#387908"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -639,7 +934,7 @@ export default function ETFDashboard() {
                         <>
                           <Area
                             type="monotone"
-                            name="IWV"
+                            name="IWV (Benchmark)"
                             dataKey="IWV_norm"
                             stroke="#ffc658"
                             fillOpacity={1}
@@ -649,7 +944,7 @@ export default function ETFDashboard() {
                           />
                           <Line
                             type="monotone"
-                            name="IWV"
+                            name="IWV (Benchmark)"
                             dataKey="IWV_norm"
                             stroke="#ffc658"
                             strokeWidth={2}
@@ -668,17 +963,21 @@ export default function ETFDashboard() {
                   </ResponsiveContainer>
                 </TabsContent>
 
-                <TabsContent value="ebi" className="h-[500px]">
+                <TabsContent value="percentageDelta" className="h-[500px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={combinedData.filter(
-                        (d) => d.EBI_norm !== undefined
+                        (d) =>
+                          d.EBI_delta_IWV !== undefined ||
+                          d.IWN_delta_IWV !== undefined ||
+                          d.VTV_delta_IWV !== undefined
                       )}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <defs>
+                        {/* Reusing base colors for delta charts for simplicity */}
                         <linearGradient
-                          id="colorEBISolo"
+                          id="colorEBIDelta"
                           x1="0"
                           y1="0"
                           x2="0"
@@ -695,130 +994,8 @@ export default function ETFDashboard() {
                             stopOpacity={0}
                           />
                         </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatDate}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis
-                        domain={[yAxisMin, yAxisMax]}
-                        tickFormatter={(value) => `${value.toFixed(0)}%`}
-                        // ticks={[85, 90, 95, 100, 105, 110, 115]}
-                        allowDataOverflow={true}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        name="EBI"
-                        dataKey="EBI_norm"
-                        stroke="#8884d8"
-                        fillOpacity={1}
-                        fill="url(#colorEBISolo)"
-                        strokeWidth={0}
-                        connectNulls={true}
-                      />
-                      <Line
-                        type="monotone"
-                        name="EBI"
-                        dataKey="EBI_norm"
-                        stroke="#8884d8"
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 6 }}
-                        connectNulls={true}
-                      />
-                      <ReferenceLine
-                        y={100}
-                        stroke="#666"
-                        strokeDasharray="3 3"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </TabsContent>
-
-                <TabsContent value="iwv" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={combinedData.filter(
-                        (d) => d.IWV_norm !== undefined
-                      )}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <defs>
                         <linearGradient
-                          id="colorIWVSolo"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#ffc658"
-                            stopOpacity={0.3}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#ffc658"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatDate}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis
-                        domain={[yAxisMin, yAxisMax]}
-                        tickFormatter={(value) => `${value.toFixed(0)}%`}
-                        // ticks={[85, 90, 95, 100, 105, 110, 115]}
-                        allowDataOverflow={true}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        name="IWV"
-                        dataKey="IWV_norm"
-                        stroke="#ffc658"
-                        fillOpacity={1}
-                        fill="url(#colorIWVSolo)"
-                        strokeWidth={0}
-                        connectNulls={true}
-                      />
-                      <Line
-                        type="monotone"
-                        name="IWV"
-                        dataKey="IWV_norm"
-                        stroke="#ffc658"
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 6 }}
-                        connectNulls={true}
-                      />
-                      <ReferenceLine
-                        y={100}
-                        stroke="#666"
-                        strokeDasharray="3 3"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </TabsContent>
-
-                <TabsContent value="delta" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={combinedData.filter((d) => d.delta !== undefined)}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="colorDelta"
+                          id="colorIWNDelta"
                           x1="0"
                           y1="0"
                           x2="0"
@@ -835,6 +1012,24 @@ export default function ETFDashboard() {
                             stopOpacity={0}
                           />
                         </linearGradient>
+                        <linearGradient
+                          id="colorVTVDelta"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#387908"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#387908"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
@@ -843,41 +1038,84 @@ export default function ETFDashboard() {
                         tick={{ fontSize: 12 }}
                       />
                       <YAxis
-                        domain={[-5, 5]} // Adjusted domain for delta if needed
+                        domain={[yAxisMinDelta, yAxisMaxDelta]}
                         tickFormatter={(value) => `${value.toFixed(1)}%`}
                         allowDataOverflow={true}
                       />
-                      <Tooltip
-                        formatter={(value: any, name: string) => [
-                          // Added name argument
-                          `${
-                            typeof value === "number" ? value.toFixed(2) : value
-                          }%`, // Check value type
-                          name === "delta" ? "EBI vs IWV Delta" : name, // Make name more descriptive
-                        ]}
-                        labelFormatter={formatDate}
-                      />
+                      <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <Area
-                        type="monotone"
-                        name="EBI vs IWV Delta"
-                        dataKey="delta"
-                        stroke="#ff7300"
-                        fillOpacity={1}
-                        fill="url(#colorDelta)"
-                        strokeWidth={0}
-                        connectNulls={true}
-                      />
-                      <Line
-                        type="monotone"
-                        name="EBI vs IWV Delta"
-                        dataKey="delta"
-                        stroke="#ff7300"
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 6 }}
-                        connectNulls={true}
-                      />
+                      {combinedData[0]?.EBI_delta_IWV !== undefined && (
+                        <>
+                          <Area
+                            type="monotone"
+                            name="EBI vs IWV"
+                            dataKey="EBI_delta_IWV"
+                            stroke="#8884d8"
+                            fillOpacity={1}
+                            fill="url(#colorEBIDelta)"
+                            strokeWidth={0}
+                            connectNulls={true}
+                          />
+                          <Line
+                            type="monotone"
+                            name="EBI vs IWV"
+                            dataKey="EBI_delta_IWV"
+                            stroke="#8884d8"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                            connectNulls={true}
+                          />
+                        </>
+                      )}
+                      {combinedData[0]?.IWN_delta_IWV !== undefined && (
+                        <>
+                          <Area
+                            type="monotone"
+                            name="IWN vs IWV"
+                            dataKey="IWN_delta_IWV"
+                            stroke="#ff7300"
+                            fillOpacity={1}
+                            fill="url(#colorIWNDelta)"
+                            strokeWidth={0}
+                            connectNulls={true}
+                          />
+                          <Line
+                            type="monotone"
+                            name="IWN vs IWV"
+                            dataKey="IWN_delta_IWV"
+                            stroke="#ff7300"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                            connectNulls={true}
+                          />
+                        </>
+                      )}
+                      {combinedData[0]?.VTV_delta_IWV !== undefined && (
+                        <>
+                          <Area
+                            type="monotone"
+                            name="VTV vs IWV"
+                            dataKey="VTV_delta_IWV"
+                            stroke="#387908"
+                            fillOpacity={1}
+                            fill="url(#colorVTVDelta)"
+                            strokeWidth={0}
+                            connectNulls={true}
+                          />
+                          <Line
+                            type="monotone"
+                            name="VTV vs IWV"
+                            dataKey="VTV_delta_IWV"
+                            stroke="#387908"
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                            connectNulls={true}
+                          />
+                        </>
+                      )}
                       <ReferenceLine
                         y={0}
                         stroke="#666"

@@ -196,85 +196,34 @@ export async function GET() {
   const resVTV = results.find((r) => r.symbol === "VTV");
 
   const comparisonDeltas: { [key: string]: string | number } = {};
+  const benchmarkSymbol = "IWV";
+  const symbolsForDelta = ["EBI", "IWN", "VTV", "VTI"];
 
-  if (resEBI?.performance !== undefined && resVTI?.performance !== undefined) {
-    comparisonDeltas["ebi_vti"] = parseFloat(
-      (resEBI.performance - resVTI.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["ebi_vti"] = "N/A (missing performance data)";
-  }
+  const benchmarkResult = results.find((r) => r.symbol === benchmarkSymbol);
 
-  if (resEBI?.performance !== undefined && resIWV?.performance !== undefined) {
-    comparisonDeltas["ebi_iwv"] = parseFloat(
-      (resEBI.performance - resIWV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["ebi_iwv"] = "N/A (missing performance data)";
-  }
+  if (benchmarkResult && benchmarkResult.performance !== undefined) {
+    for (const sym of symbolsForDelta) {
+      const symResult = results.find((r) => r.symbol === sym);
+      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
 
-  if (resEBI?.performance !== undefined && resIWN?.performance !== undefined) {
-    comparisonDeltas["ebi_iwn"] = parseFloat(
-      (resEBI.performance - resIWN.performance).toFixed(2)
-    );
+      if (symResult && symResult.performance !== undefined) {
+        comparisonDeltas[deltaKey] = parseFloat(
+          (symResult.performance - benchmarkResult.performance).toFixed(2)
+        );
+      } else {
+        comparisonDeltas[
+          deltaKey
+        ] = `N/A (missing performance for ${sym} or ${benchmarkSymbol})`;
+      }
+    }
   } else {
-    comparisonDeltas["ebi_iwn"] = "N/A (missing performance data)";
-  }
-
-  if (resEBI?.performance !== undefined && resVTV?.performance !== undefined) {
-    comparisonDeltas["ebi_vtv"] = parseFloat(
-      (resEBI.performance - resVTV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["ebi_vtv"] = "N/A (missing performance data)";
-  }
-
-  if (resVTI?.performance !== undefined && resIWV?.performance !== undefined) {
-    comparisonDeltas["vti_iwv"] = parseFloat(
-      (resVTI.performance - resIWV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["vti_iwv"] = "N/A (missing performance data)";
-  }
-
-  if (resVTI?.performance !== undefined && resIWN?.performance !== undefined) {
-    comparisonDeltas["vti_iwn"] = parseFloat(
-      (resVTI.performance - resIWN.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["vti_iwn"] = "N/A (missing performance data)";
-  }
-
-  if (resVTI?.performance !== undefined && resVTV?.performance !== undefined) {
-    comparisonDeltas["vti_vtv"] = parseFloat(
-      (resVTI.performance - resVTV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["vti_vtv"] = "N/A (missing performance data)";
-  }
-
-  if (resIWV?.performance !== undefined && resIWN?.performance !== undefined) {
-    comparisonDeltas["iwv_iwn"] = parseFloat(
-      (resIWV.performance - resIWN.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["iwv_iwn"] = "N/A (missing performance data)";
-  }
-
-  if (resIWV?.performance !== undefined && resVTV?.performance !== undefined) {
-    comparisonDeltas["iwv_vtv"] = parseFloat(
-      (resIWV.performance - resVTV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["iwv_vtv"] = "N/A (missing performance data)";
-  }
-
-  if (resIWN?.performance !== undefined && resVTV?.performance !== undefined) {
-    comparisonDeltas["iwn_vtv"] = parseFloat(
-      (resIWN.performance - resVTV.performance).toFixed(2)
-    );
-  } else {
-    comparisonDeltas["iwn_vtv"] = "N/A (missing performance data)";
+    // If benchmark (IWV) data is missing, all deltas against it are N/A
+    for (const sym of symbolsForDelta) {
+      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
+      comparisonDeltas[
+        deltaKey
+      ] = `N/A (missing performance for ${benchmarkSymbol})`;
+    }
   }
 
   const finalJsonOutput = {
