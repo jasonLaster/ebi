@@ -1,9 +1,17 @@
-import { Alglib } from "./vendor/Alglib-v1.1.0.js";
 import * as fs from "fs";
 import * as path from "path";
-// ml-matrix is not strictly needed if all math is done with plain arrays for Alglib
-// but initial data processing might still use it or be adapted.
-// For now, let's assume we pass plain arrays to Alglib.
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+// Fix for __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Make __dirname globally available for the Alglib module
+global.__dirname = __dirname;
+global.__filename = __filename;
+
+import { Alglib } from "./vendor/Alglib-v1.1.0.js";
 
 // Helper function to load and process holdings JSON
 async function loadHoldings(filePath) {
@@ -13,8 +21,13 @@ async function loadHoldings(filePath) {
   const holdingsMap = new Map();
   if (data && data.holdings) {
     for (const symbol in data.holdings) {
-      const weight = parseFloat(data.holdings[symbol].weight);
-      holdingsMap.set(symbol, (isNaN(weight) ? 0 : weight) / 100); // Convert percentage to decimal
+      // For EBI, use actual_weight instead of weight
+      const weightField = data.etfSymbol === "EBI" ? "actual_weight" : "weight";
+      const weight = parseFloat(data.holdings[symbol][weightField]);
+      // For EBI, weights are in percentage form (e.g., 5.8613 = 5.86%)
+      // For others, weights are in decimal form (e.g., 0.0621 = 6.21%)
+      const finalWeight = data.etfSymbol === "EBI" ? weight / 100 : weight;
+      holdingsMap.set(symbol, isNaN(finalWeight) ? 0 : finalWeight);
     }
   }
   return holdingsMap;
@@ -25,13 +38,21 @@ async function main() {
 
   alglib.promise
     .then(async () => {
-      console.log("Alglib WASM is ready (using Pterodactylus wrapper).");
+      console.log("Alglib WASM is ready. Starting portfolio approximation...");
       try {
         // 1. Load Holdings Data
-        const ebiHoldingsMap = await loadHoldings("data/ebi_holdings.json");
-        const vtiHoldingsMap = await loadHoldings("data/vti_holdings.json");
-        const vtvHoldingsMap = await loadHoldings("data/vtv_holdings.json");
-        const iwnHoldingsMap = await loadHoldings("data/iwn_holdings.json");
+        const ebiHoldingsMap = await loadHoldings(
+          path.join(__dirname, "../data/data-may/ebi_holdings.json")
+        );
+        const vtiHoldingsMap = await loadHoldings(
+          path.join(__dirname, "../data/data-may/vti_holdings.json")
+        );
+        const vtvHoldingsMap = await loadHoldings(
+          path.join(__dirname, "../data/data-may/vtv_holdings.json")
+        );
+        const iwnHoldingsMap = await loadHoldings(
+          path.join(__dirname, "../data/data-may/iwn_holdings.json")
+        );
 
         // 2. Consolidate Stock Symbols
         const allSymbols = new Set([
@@ -53,6 +74,7 @@ async function main() {
         const H_A = sortedSymbols.map(
           (symbol) => ebiHoldingsMap.get(symbol) || 0
         );
+
         const H_ETFs_columns = [
           sortedSymbols.map((symbol) => vtiHoldingsMap.get(symbol) || 0),
           sortedSymbols.map((symbol) => vtvHoldingsMap.get(symbol) || 0),
@@ -87,46 +109,28 @@ async function main() {
         const initialGuess = [0.75, 0.1, 0.15]; // VTI 75%, VTV 10%, IWN 15%
         const initialObjectiveValue = objectiveFunction(initialGuess);
         console.log(
-          "Objective Value for Initial Guess (75% VTI, 10% VTV, 15% IWN):",
-          initialObjectiveValue
+          "Initial guess (75% VTI, 10% VTV, 15% IWN) objective value:",
+          initialObjectiveValue.toFixed(6)
         );
 
-        // 5. Define Constraints for alglib.add_..._constraint()
-        // This section defines constraints for the optimization problem:
-
-        // First constraint: All weights must sum to 100%
-        // Example: w1 + w2 + w3 = 1.0 (or 100%)
+        // 5. Define Constraints
+        // All weights must sum to 100%
         alglib.add_equality_constraint((weights_arr) => {
           return weights_arr.reduce((sum, w) => sum + w, 0) - 1.0;
         });
 
-        // Second set of constraints: Each weight must be between 0% and 100%
-        // We need two inequalities per weight:
-
-        // Lower bound: Each weight must be >= 0
-        // Rewritten as: -w_i <= 0
+        // Each weight must be between 0% and 100%
         for (let j = 0; j < nVars; j++) {
           alglib.add_less_than_or_equal_to_constraint(
             (weights_arr) => -weights_arr[j]
           );
-        }
-
-        // Upper bound: Each weight must be <= 1 (100%)
-        // Rewritten as: w_i - 1 <= 0
-        for (let j = 0; j < nVars; j++) {
           alglib.add_less_than_or_equal_to_constraint(
             (weights_arr) => weights_arr[j] - 1.0
           );
         }
 
-        // 6. Initial Guess
-        // const initialGuess = [0.75, 0.10, 0.15]; // VTI 75%, VTV 10%, IWN 15% - Moved up for initial calculation
-
-        // 7. Run Optimization using alglib.solve()
-        // solve(mode, xi, xs=[], max_iterations=50000, penalty=50.0, radius=0.1, diffstep=0.000001, stop_threshold=0.00001)
-        console.log(
-          "Starting optimization with Alglib.js wrapper (alglib.solve)..."
-        );
+        // 6. Run Optimization
+        console.log("Starting optimization...");
         const solveStatus = alglib.solve(
           "min",
           initialGuess,
@@ -140,49 +144,108 @@ async function main() {
 
         if (solveStatus) {
           const optimalWeights = alglib.get_results();
-          const finalObjectiveValue = objectiveFunction(optimalWeights); // Recalculate objective value
-          const report = alglib.get_report();
+          const finalObjectiveValue = objectiveFunction(optimalWeights);
 
-          console.log("Alglib.solve() finished.");
+          console.log("\n=== PORTFOLIO APPROXIMATION RESULTS ===");
+          console.log("Optimal weights:");
+          console.log(`  VTI: ${(optimalWeights[0] * 100).toFixed(2)}%`);
+          console.log(`  VTV: ${(optimalWeights[1] * 100).toFixed(2)}%`);
+          console.log(`  IWN: ${(optimalWeights[2] * 100).toFixed(2)}%`);
           console.log(
-            "Optimal weights (VTI, VTV, IWN):",
-            optimalWeights.map((w) => (w * 100).toFixed(2) + "%")
+            `Total: ${(
+              optimalWeights.reduce((sum, w) => sum + w, 0) * 100
+            ).toFixed(2)}%`
           );
           console.log(
-            "Final Objective Value (Sum of Squared Error):",
-            finalObjectiveValue
+            `\nOptimization error (sum of squared differences): ${finalObjectiveValue.toFixed(
+              6
+            )}`
           );
-          console.log("--- Alglib Report ---");
-          console.log(report);
-          console.log("--- End Alglib Report ---");
-        } else {
-          console.error(
-            "Alglib.solve() reported an issue or did not complete successfully."
+          console.log(
+            `Improvement from initial guess: ${(
+              ((initialObjectiveValue - finalObjectiveValue) /
+                initialObjectiveValue) *
+              100
+            ).toFixed(2)}%`
           );
-          console.log("Alglib status text:", alglib.get_status());
-          const report = alglib.get_report(); // Get report even on failure
-          if (report) {
-            console.log("--- Alglib Report (on failure) ---");
-            console.log(report);
-            console.log("--- End Alglib Report (on failure) ---");
+
+          // Calculate some statistics
+          let totalError = 0;
+          let maxError = 0;
+          let errorCount = 0;
+
+          for (let i = 0; i < nStocks; i++) {
+            const syntheticHolding =
+              H_stack[i][0] * optimalWeights[0] +
+              H_stack[i][1] * optimalWeights[1] +
+              H_stack[i][2] * optimalWeights[2];
+            const diff = Math.abs(syntheticHolding - H_A[i]);
+            totalError += diff;
+            maxError = Math.max(maxError, diff);
+            if (diff > 0.001) errorCount++;
           }
+
+          console.log(`\nError Statistics:`);
+          console.log(
+            `  Average absolute error: ${(totalError / nStocks).toFixed(6)}`
+          );
+          console.log(`  Maximum absolute error: ${maxError.toFixed(6)}`);
+          console.log(`  Stocks with error > 0.1%: ${errorCount}/${nStocks}`);
+
+          // Save results to JSON file
+          const results = {
+            timestamp: new Date().toISOString(),
+            optimalWeights: {
+              vti: optimalWeights[0],
+              vtv: optimalWeights[1],
+              iwn: optimalWeights[2],
+            },
+            weightsPercentages: {
+              vti: optimalWeights[0] * 100,
+              vtv: optimalWeights[1] * 100,
+              iwn: optimalWeights[2] * 100,
+            },
+            optimizationMetrics: {
+              finalObjectiveValue,
+              initialObjectiveValue,
+              improvementPercent:
+                ((initialObjectiveValue - finalObjectiveValue) /
+                  initialObjectiveValue) *
+                100,
+              averageError: totalError / nStocks,
+              maxError,
+              errorCount,
+              totalStocks: nStocks,
+            },
+            constraints: {
+              weightsSum: optimalWeights.reduce((sum, w) => sum + w, 0),
+              allWeightsNonNegative: optimalWeights.every((w) => w >= 0),
+              allWeightsLessThanOne: optimalWeights.every((w) => w <= 1),
+            },
+          };
+
+          const outputPath = path.join(
+            __dirname,
+            "../data/portfolio_approximation_results.json"
+          );
+          await fs.promises.writeFile(
+            outputPath,
+            JSON.stringify(results, null, 2)
+          );
+          console.log(`\nResults saved to: ${outputPath}`);
+        } else {
+          console.error("Optimization failed.");
+          console.log("Alglib status:", alglib.get_status());
         }
       } catch (error) {
-        console.error(
-          "An error occurred during Alglib optimization (Pterodactylus wrapper approach):",
-          error
-        );
+        console.error("An error occurred during optimization:", error);
       } finally {
-        // The Pterodactylus wrapper's remove() method should clean up its internal instance and WASM stuff.
         alglib.remove();
-        console.log("Alglib instance (Pterodactylus wrapper) removed.");
+        console.log("Optimization complete.");
       }
     })
     .catch((error) => {
-      console.error(
-        "Alglib WASM failed to load or an error occurred in promise.then chain:",
-        error
-      );
+      console.error("Alglib WASM failed to load:", error);
     });
 }
 

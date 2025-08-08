@@ -27,6 +27,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Area, ReferenceLine } from "recharts";
 import React, { useEffect, useState, useMemo } from "react";
+import { PortfolioApproximation } from "@/components/portfolio-approximation";
+import { PortfolioComparison } from "@/components/portfolio-comparison";
 
 // Define interfaces for the API response
 interface PerformanceEntry {
@@ -687,6 +689,16 @@ export default function ETFDashboard() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Portfolio Approximation Section */}
+      <div className="mb-8">
+        <PortfolioApproximation />
+      </div>
+
+      {/* Portfolio Comparison Section */}
+      <div className="mb-8">
+        <PortfolioComparison />
       </div>
 
       {/* Charts Section */}
