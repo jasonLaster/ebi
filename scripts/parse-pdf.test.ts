@@ -1,9 +1,14 @@
+/// <reference types="bun-types" />
+/// <reference types="node" />
+
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { parsePdfToJson, type Holding, type HoldingsData } from "./parse-pdf";
+import { parsePdfToJson, type HoldingsData } from "./parse-pdf";
+import { Database } from "bun:sqlite";
+import * as os from "os";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -102,13 +107,18 @@ describe("EBI Holdings Validation", () => {
 });
 
 describe("parsePdfToJson function", () => {
-  const testOutputPath = path.join(__dirname, "../data/test_output.json");
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ebi-parse-pdf-"));
+  const testOutputPath = path.join(tmpDir, "test_output.json");
+  const testDbPath = path.join(tmpDir, "holdings.db");
   const inputPdfPath = path.join(__dirname, "../in/holdings.pdf");
 
   afterAll(() => {
     // Clean up test output file
     if (fs.existsSync(testOutputPath)) {
       fs.unlinkSync(testOutputPath);
+    }
+    if (fs.existsSync(testDbPath)) {
+      fs.unlinkSync(testDbPath);
     }
   });
 
@@ -123,6 +133,7 @@ describe("parsePdfToJson function", () => {
     const result = await parsePdfToJson(inputPdfPath, testOutputPath, {
       analyze: false,
       silent: true,
+      sqlitePath: testDbPath,
     });
 
     // Verify output file was created
@@ -145,13 +156,37 @@ describe("parsePdfToJson function", () => {
     expect(result.holdings["AA"].name).toBe("Alcoa Corp");
     expect(result.holdings["AAMI"]).toBeDefined();
     expect(result.holdings["AAMI"].name).toBe("Acadian Asset Management Inc");
+
+    // Verify DB was created and has rows for EBI
+    expect(fs.existsSync(testDbPath)).toBe(true);
+    const db = new Database(testDbPath, { readonly: true });
+    try {
+      const row = db
+        .query(
+          `
+          SELECT e.symbol as symbol, COUNT(*) as n
+          FROM holdings h
+          JOIN etfs e ON e.id = h.etf_id
+          WHERE e.symbol = 'EBI'
+          GROUP BY e.symbol
+        `
+        )
+        .get() as { symbol: string; n: number } | null;
+      expect(row).not.toBeNull();
+      expect(row!.n).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
   });
 
   test("should throw error for non-existent PDF file", async () => {
     const nonExistentPath = path.join(__dirname, "../in/non-existent.pdf");
 
     await expect(
-      parsePdfToJson(nonExistentPath, testOutputPath, { silent: true })
+      parsePdfToJson(nonExistentPath, testOutputPath, {
+        silent: true,
+        sqlitePath: testDbPath,
+      })
     ).rejects.toThrow("PDF file not found");
   });
 
@@ -162,13 +197,11 @@ describe("parsePdfToJson function", () => {
     }
 
     // Test with analyze enabled (should output analysis)
-    const outputPath1 = path.join(
-      __dirname,
-      "../data/test_output_analyze.json"
-    );
+    const outputPath1 = path.join(tmpDir, "test_output_analyze.json");
     const result1 = await parsePdfToJson(inputPdfPath, outputPath1, {
       analyze: true,
       silent: false,
+      sqlitePath: testDbPath,
     });
 
     expect(result1).toBeDefined();

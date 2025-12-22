@@ -1,6 +1,7 @@
 ## Development
 
 - use bun
+- do not use pnpm
 - use types (tsc)
 - use a linter (eslint)
 

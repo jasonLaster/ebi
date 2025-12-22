@@ -17,6 +17,7 @@ The dashboard provides:
 
 - Node.js 18+
 - pnpm (recommended) or npm
+- Bun (for scripts/tests)
 - Financial Modeling Prep API key
 
 ### Installation
@@ -32,8 +33,8 @@ The dashboard provides:
 2. **Set up environment variables:**
 
    ```bash
-   cp .env.example .env
-   # Add your FMP_API_KEY to .env
+   cp env.example .env
+   # Add your FMP_API_KEY to .env (used by fetch-holdings)
    ```
 
 3. **Run portfolio approximation:**
@@ -90,16 +91,19 @@ ebi/
 │   ├── ui/                      # UI components (shadcn/ui)
 │   └── portfolio-approximation.tsx # Portfolio approximation component
 ├── data/                        # Data files
-│   ├── data-may/                # Holdings data
-│   │   ├── ebi_holdings.json    # EBI holdings
-│   │   ├── vti_holdings.json    # VTI holdings
-│   │   ├── vtv_holdings.json    # VTV holdings
-│   │   └── iwn_holdings.json    # IWN holdings
-│   └── portfolio_approximation_results.json # Optimization results
+│   ├── ebi_holdings.json        # EBI holdings (from PDF)
+│   ├── vti_holdings.json        # VTI holdings (from API)
+│   ├── vtv_holdings.json        # VTV holdings (from API)
+│   ├── iwn_holdings.json        # IWN holdings (from API)
+│   └── holdings.db              # SQLite mirror of holdings (Bun sqlite)
+├── src/                         # Business logic (reusable)
+│   ├── lib/                     # Shared libs (types, db, API client)
+│   └── holdings/                # Holdings fetch/parse/storage modules
 ├── scripts/                     # Analysis scripts
 │   ├── parse-pdf.ts             # PDF holdings parser (extracts and parses PDF to JSON)
 │   ├── parse-pdf.test.ts        # Tests for PDF parsing
-│   ├── extract_pdf_holdings.js  # PDF text extraction utility
+│   ├── fetch-holdings.ts        # Fetch holdings from FMP API (VTI/VTV/IWN)
+│   ├── fetch-holdings.test.ts   # Tests for fetch holdings + sqlite
 │   ├── approximate_holdings.js  # Main optimization script
 │   ├── run-approximation.sh     # Convenience script
 │   └── vendor/                  # Third-party libraries
@@ -122,6 +126,24 @@ bun scripts/parse-pdf.ts in/holdings.pdf data/ebi_holdings.json
 
 # Or use the npm script:
 bun run parse:pdf in/holdings.pdf data/ebi_holdings.json
+
+# Write to sqlite too (default: data/holdings.db):
+bun scripts/parse-pdf.ts in/holdings.pdf data/ebi_holdings.json --sqlite data/holdings.db
+```
+
+### Fetch Holdings (Baseline ETFs)
+
+Fetch holdings for the baseline ETFs (VTI, VTV, IWN) from Financial Modeling Prep and store both JSON and SQLite:
+
+```bash
+# Fetch all baseline ETFs
+bun run fetch:all
+
+# Fetch a subset
+bun run fetch:holdings VTI VTV
+
+# Override output dir and sqlite db
+bun run fetch:holdings --all --out-dir data --sqlite data/holdings.db
 ```
 
 ### Portfolio Approximation
