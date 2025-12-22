@@ -10,14 +10,14 @@ import { runApproximation } from "../../../src/approximation/optimize";
 /**
  * Determines the base directory based on environment.
  * - Serverless (Vercel): Uses /tmp (only writable location)
- * - Local development: Uses in/ directory (existing behavior)
+ * - Local development: Uses data/ directory (existing behavior)
  */
 function getBaseDir(): string {
   // Check if running in Vercel serverless environment
   const isServerless = !!process.env.VERCEL || !!process.env.VERCEL_ENV;
   return isServerless
     ? "/tmp"
-    : path.resolve(process.cwd(), "in");
+    : path.resolve(process.cwd(), "data");
 }
 
 function ensureParentDir(filePath: string): void {

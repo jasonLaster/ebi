@@ -6,7 +6,7 @@ import AdmZip from "adm-zip";
 
 /**
  * Downloads the latest EBI holdings PDF from Longview Research Partners
- * @param outputPath Optional custom output path. If not provided, generates a timestamped filename in the 'in' directory
+ * @param outputPath Optional custom output path. If not provided, generates a timestamped filename in the 'data' directory
  * @returns The path to the downloaded PDF file
  */
 export async function downloadHoldingsPdf(
@@ -28,7 +28,7 @@ export async function downloadHoldingsPdf(
       .replace(/[:.]/g, "-")
       .slice(0, -5);
     const filename = `ebi-holdings-${timestamp}.pdf`;
-    outputPath = path.resolve(process.cwd(), "in", filename);
+    outputPath = path.resolve(process.cwd(), "data", filename);
   } else {
     outputPath = path.isAbsolute(outputPath)
       ? outputPath

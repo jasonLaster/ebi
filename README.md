@@ -121,13 +121,13 @@ Parse PDF holdings files into JSON format:
 bun scripts/parse-pdf.ts <input-pdf-path> <output-json-path>
 
 # Example:
-bun scripts/parse-pdf.ts in/holdings.pdf data/ebi_holdings.json
+bun scripts/parse-pdf.ts data/holdings.pdf data/ebi_holdings.json
 
 # Or use the npm script:
-bun run parse:pdf in/holdings.pdf data/ebi_holdings.json
+bun run parse:pdf data/holdings.pdf data/ebi_holdings.json
 
 # Write to sqlite too (default: data/holdings.db):
-bun scripts/parse-pdf.ts in/holdings.pdf data/ebi_holdings.json --sqlite data/holdings.db
+bun scripts/parse-pdf.ts data/holdings.pdf data/ebi_holdings.json --sqlite data/holdings.db
 ```
 
 ### Fetch Holdings (Baseline ETFs)

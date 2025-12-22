@@ -108,7 +108,7 @@ describe("EBI Holdings Validation", () => {
 describe("parsePdfToJson function", () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ebi-parse-pdf-"));
   const testOutputPath = path.join(tmpDir, "test_output.json");
-  const inputPdfPath = path.join(__dirname, "../in/holdings.pdf");
+  const inputPdfPath = path.join(__dirname, "../data/holdings.pdf");
 
   afterAll(() => {
     // Clean up test output file
@@ -179,7 +179,7 @@ describe("parsePdfToJson function", () => {
   });
 
   test("should throw error for non-existent PDF file", async () => {
-    const nonExistentPath = path.join(__dirname, "../in/non-existent.pdf");
+    const nonExistentPath = path.join(__dirname, "../data/non-existent.pdf");
 
     await expect(
       parsePdfToJson(nonExistentPath, testOutputPath, {

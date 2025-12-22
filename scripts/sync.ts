@@ -69,7 +69,7 @@ async function main(): Promise<void> {
     console.log(`✅ Downloaded: ${pdfPath}\n`);
   } else {
     // Use provided PDF or default
-    pdfPath = resolvePath(pdfArg ?? "in/holdings.pdf");
+    pdfPath = resolvePath(pdfArg ?? "data/holdings.pdf");
     if (!fs.existsSync(pdfPath)) {
       throw new Error(`PDF file not found: ${pdfPath}`);
     }
