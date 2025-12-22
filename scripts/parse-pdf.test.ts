@@ -7,7 +7,6 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { parsePdfToJson, type HoldingsData } from "./parse-pdf";
-import { Database } from "bun:sqlite";
 import * as os from "os";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -109,16 +108,12 @@ describe("EBI Holdings Validation", () => {
 describe("parsePdfToJson function", () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ebi-parse-pdf-"));
   const testOutputPath = path.join(tmpDir, "test_output.json");
-  const testDbPath = path.join(tmpDir, "holdings.db");
   const inputPdfPath = path.join(__dirname, "../in/holdings.pdf");
 
   afterAll(() => {
     // Clean up test output file
     if (fs.existsSync(testOutputPath)) {
       fs.unlinkSync(testOutputPath);
-    }
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
     }
   });
 
@@ -130,11 +125,20 @@ describe("parsePdfToJson function", () => {
       return;
     }
 
-    const result = await parsePdfToJson(inputPdfPath, testOutputPath, {
-      analyze: false,
-      silent: true,
-      sqlitePath: testDbPath,
-    });
+    // Skip test if Turso credentials are not set
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      return;
+    }
+
+    const { openHoldingsDb } = await import("../src/lib/db");
+    const db = await openHoldingsDb();
+    try {
+      const result = await parsePdfToJson(inputPdfPath, testOutputPath, {
+        analyze: false,
+        silent: true,
+        db,
+      });
 
     // Verify output file was created
     expect(fs.existsSync(testOutputPath)).toBe(true);
@@ -157,23 +161,21 @@ describe("parsePdfToJson function", () => {
     expect(result.holdings["AAMI"]).toBeDefined();
     expect(result.holdings["AAMI"].name).toBe("Acadian Asset Management Inc");
 
-    // Verify DB was created and has rows for EBI
-    expect(fs.existsSync(testDbPath)).toBe(true);
-    const db = new Database(testDbPath, { readonly: true });
+    // Verify DB has rows for EBI
+    const { openHoldingsDb } = await import("../src/lib/db");
+    const db = await openHoldingsDb();
     try {
-      const row = db
-        .query(
-          `
+      const result = await db.execute({
+        sql: `
           SELECT e.symbol as symbol, COUNT(*) as n
           FROM holdings h
           JOIN etfs e ON e.id = h.etf_id
           WHERE e.symbol = 'EBI'
           GROUP BY e.symbol
-        `
-        )
-        .get() as { symbol: string; n: number } | null;
-      expect(row).not.toBeNull();
-      expect(row!.n).toBeGreaterThan(0);
+        `,
+      });
+      expect(result.rows.length).toBeGreaterThan(0);
+      expect(Number(result.rows[0].n)).toBeGreaterThan(0);
     } finally {
       db.close();
     }
@@ -185,7 +187,6 @@ describe("parsePdfToJson function", () => {
     await expect(
       parsePdfToJson(nonExistentPath, testOutputPath, {
         silent: true,
-        sqlitePath: testDbPath,
       })
     ).rejects.toThrow("PDF file not found");
   });
@@ -196,20 +197,32 @@ describe("parsePdfToJson function", () => {
       return;
     }
 
+    // Skip test if Turso credentials are not set
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      return;
+    }
+
     // Test with analyze enabled (should output analysis)
     const outputPath1 = path.join(tmpDir, "test_output_analyze.json");
-    const result1 = await parsePdfToJson(inputPdfPath, outputPath1, {
-      analyze: true,
-      silent: false,
-      sqlitePath: testDbPath,
-    });
+    const { openHoldingsDb } = await import("../src/lib/db");
+    const db = await openHoldingsDb();
+    try {
+      const result1 = await parsePdfToJson(inputPdfPath, outputPath1, {
+        analyze: true,
+        silent: false,
+        db,
+      });
 
-    expect(result1).toBeDefined();
-    expect(Object.keys(result1.holdings).length).toBeGreaterThan(0);
+      expect(result1).toBeDefined();
+      expect(Object.keys(result1.holdings).length).toBeGreaterThan(0);
 
-    // Clean up
-    if (fs.existsSync(outputPath1)) {
-      fs.unlinkSync(outputPath1);
+      // Clean up
+      if (fs.existsSync(outputPath1)) {
+        fs.unlinkSync(outputPath1);
+      }
+    } finally {
+      db.close();
     }
   });
 });

@@ -1,4 +1,8 @@
-import { fetchEtfHoldingsFromFmp, normalizeFmpHoldingsToMap, FetchLike } from "../lib/fmp-api";
+import {
+  fetchEtfHoldingsFromFmp,
+  normalizeFmpHoldingsToMap,
+  FetchLike,
+} from "../lib/fmp-api";
 import { HoldingsData } from "../lib/types";
 import { openHoldingsDb, HoldingsDb } from "../lib/db";
 import { writeHoldingsOutputs } from "./storage";
@@ -25,7 +29,6 @@ export async function fetchAndStoreEtfHoldings(
   symbol: string,
   opts: {
     outDir: string;
-    sqlitePath?: string;
     db?: HoldingsDb;
     apiKey?: string;
     fetchImpl?: FetchLike;
@@ -36,10 +39,12 @@ export async function fetchAndStoreEtfHoldings(
     fetchImpl: opts.fetchImpl,
   });
 
-  const jsonPath = path.join(opts.outDir, `${symbol.toLowerCase()}_holdings.json`);
-  const res = writeHoldingsOutputs(data, {
+  const jsonPath = path.join(
+    opts.outDir,
+    `${symbol.toLowerCase()}_holdings.json`
+  );
+  const res = await writeHoldingsOutputs(data, {
     jsonPath,
-    sqlitePath: opts.sqlitePath,
     db: opts.db,
   });
   return { symbol: data.etfSymbol, jsonPath: res.jsonPath };
@@ -47,12 +52,16 @@ export async function fetchAndStoreEtfHoldings(
 
 export async function fetchAndStoreManyEtfHoldings(
   symbols: string[],
-  opts: { outDir: string; sqlitePath?: string; apiKey?: string; fetchImpl?: FetchLike }
-): Promise<{ dbPath?: string; outputs: { symbol: string; jsonPath: string }[] }> {
-  const db =
-    opts.sqlitePath && opts.sqlitePath.length > 0
-      ? openHoldingsDb(opts.sqlitePath)
-      : undefined;
+  opts: {
+    outDir: string;
+    db?: HoldingsDb;
+    apiKey?: string;
+    fetchImpl?: FetchLike;
+  }
+): Promise<{
+  outputs: { symbol: string; jsonPath: string }[];
+}> {
+  const db = opts.db ?? (await openHoldingsDb());
 
   try {
     const outputs: { symbol: string; jsonPath: string }[] = [];
@@ -60,16 +69,17 @@ export async function fetchAndStoreManyEtfHoldings(
       outputs.push(
         await fetchAndStoreEtfHoldings(s, {
           outDir: opts.outDir,
-          sqlitePath: opts.sqlitePath,
           db,
           apiKey: opts.apiKey,
           fetchImpl: opts.fetchImpl,
         })
       );
     }
-    return { dbPath: opts.sqlitePath, outputs };
+    return { outputs };
   } finally {
-    db?.close();
+    if (!opts.db) {
+      // Only close if we created the connection
+      db.close();
+    }
   }
 }
-

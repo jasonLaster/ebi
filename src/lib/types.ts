@@ -17,4 +17,3 @@ export interface EtfHoldingRow extends Holding {
   etfSymbol: string;
   ticker: string;
 }
-

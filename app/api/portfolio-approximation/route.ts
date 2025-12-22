@@ -43,8 +43,8 @@ export async function GET() {
           results.optimizationMetrics.improvementPercent > 5
             ? "High"
             : results.optimizationMetrics.improvementPercent > 2
-            ? "Medium"
-            : "Low",
+              ? "Medium"
+              : "Low",
       },
     };
 

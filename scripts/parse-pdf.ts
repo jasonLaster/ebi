@@ -10,8 +10,15 @@ import {
   extractTextFromPdf,
   analyzeHoldings,
 } from "../src/holdings/parse-pdf";
+import { openHoldingsDb } from "../src/lib/db";
 
-export { parsePdfToJson, parsePdfToHoldingsData, parseHoldingsFromText, extractTextFromPdf, analyzeHoldings };
+export {
+  parsePdfToJson,
+  parsePdfToHoldingsData,
+  parseHoldingsFromText,
+  extractTextFromPdf,
+  analyzeHoldings,
+};
 export type { Holding, HoldingsData } from "../src/lib/types";
 
 async function main(): Promise<void> {
@@ -25,24 +32,28 @@ async function main(): Promise<void> {
     .argument("<output-json>", "Path to output JSON file")
     .option("-a, --no-analyze", "Skip holdings analysis")
     .option("-s, --silent", "Suppress output messages")
-    .option("--sqlite <path>", "Write results to sqlite db", "data/holdings.db")
-    .option("--no-sqlite", "Disable sqlite output")
+    .option("--no-db", "Disable database output")
     .action(
       async (
         inputPdf: string,
         outputJson: string,
-        options: { analyze: boolean; silent: boolean; sqlite: string | false }
+        options: { analyze: boolean; silent: boolean; db?: boolean }
       ) => {
-      try {
-        await parsePdfToJson(inputPdf, outputJson, {
-          analyze: options.analyze !== false,
-          silent: options.silent === true,
-          sqlitePath: options.sqlite === false ? null : options.sqlite,
-        });
-      } catch (error) {
-        console.error("Error processing PDF:", error);
-        process.exit(1);
-      }
+        try {
+          const db = options.db === false ? undefined : await openHoldingsDb();
+          try {
+            await parsePdfToJson(inputPdf, outputJson, {
+              analyze: options.analyze !== false,
+              silent: options.silent === true,
+              db,
+            });
+          } finally {
+            if (db) db.close();
+          }
+        } catch (error) {
+          console.error("Error processing PDF:", error);
+          process.exit(1);
+        }
       }
     );
 

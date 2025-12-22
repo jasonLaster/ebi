@@ -51,13 +51,21 @@ describe("holdings fetch (FMP)", () => {
     expect(data.holdings.BBB.actual_weight).toBeCloseTo(0.75, 6);
   });
 
-  test("fetchAndStoreManyEtfHoldings writes JSON and SQLite", async () => {
+  test("fetchAndStoreManyEtfHoldings writes JSON and Turso", async () => {
+    // Skip test if Turso credentials are not set
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log(
+        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
+      );
+      return;
+    }
+
     const tmpDir = makeTempDir();
     const outDir = path.join(tmpDir, "data");
-    const sqlitePath = path.join(outDir, "holdings.db");
 
     const fetchImpl = async (url: string | URL | Request) => {
-      const sym = (url as string).match(/etf-holder\/([A-Z0-9]+)/)?.[1] ?? "UNKNOWN";
+      const sym =
+        (url as string).match(/etf-holder\/([A-Z0-9]+)/)?.[1] ?? "UNKNOWN";
       const raw =
         sym === "VTI"
           ? [
@@ -87,35 +95,34 @@ describe("holdings fetch (FMP)", () => {
       });
     };
 
-    const res = await fetchAndStoreManyEtfHoldings(["VTI", "VTV"], {
-      outDir,
-      sqlitePath,
-      apiKey: "test",
-      fetchImpl,
-    });
-
-    expect(res.outputs.length).toBe(2);
-    const vtiJson = path.join(outDir, "vti_holdings.json");
-    const vtvJson = path.join(outDir, "vtv_holdings.json");
-    expect(fs.existsSync(vtiJson)).toBe(true);
-    expect(fs.existsSync(vtvJson)).toBe(true);
-    expect(fs.existsSync(sqlitePath)).toBe(true);
-
-    const parsedVti = JSON.parse(fs.readFileSync(vtiJson, "utf8"));
-    expect(parsedVti.etfSymbol).toBe("VTI");
-    expect(parsedVti.holdings.AAPL).toBeDefined();
-
-    const db = openHoldingsDb(sqlitePath);
+    const db = await openHoldingsDb();
     try {
-      const etfCount = db.prepare("SELECT COUNT(*) as c FROM etfs").get() as {
-        c: number;
-      };
-      expect(etfCount.c).toBe(2);
+      const res = await fetchAndStoreManyEtfHoldings(["VTI", "VTV"], {
+        outDir,
+        db,
+        apiKey: "test",
+        fetchImpl,
+      });
 
-      const holdingCount = db
-        .prepare("SELECT COUNT(*) as c FROM holdings")
-        .get() as { c: number };
-      expect(holdingCount.c).toBe(2);
+      expect(res.outputs.length).toBe(2);
+      const vtiJson = path.join(outDir, "vti_holdings.json");
+      const vtvJson = path.join(outDir, "vtv_holdings.json");
+      expect(fs.existsSync(vtiJson)).toBe(true);
+      expect(fs.existsSync(vtvJson)).toBe(true);
+
+      const parsedVti = JSON.parse(fs.readFileSync(vtiJson, "utf8"));
+      expect(parsedVti.etfSymbol).toBe("VTI");
+      expect(parsedVti.holdings.AAPL).toBeDefined();
+
+      const etfResult = await db.execute({
+        sql: "SELECT COUNT(*) as c FROM etfs",
+      });
+      expect(Number(etfResult.rows[0].c)).toBe(2);
+
+      const holdingResult = await db.execute({
+        sql: "SELECT COUNT(*) as c FROM holdings",
+      });
+      expect(Number(holdingResult.rows[0].c)).toBe(2);
     } finally {
       db.close();
     }

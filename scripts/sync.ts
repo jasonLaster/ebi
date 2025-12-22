@@ -27,7 +27,6 @@ async function main(): Promise<void> {
     )
     .argument("[pdf]", "Path to EBI holdings PDF (if not provided, downloads latest)")
     .option("-o, --out-dir <dir>", "Output directory", "data")
-    .option("--db <path>", "SQLite DB path", "data/holdings.db")
     .option("--target <symbol>", "Target ETF symbol", "EBI")
     .option(
       "--baseline <symbols>",
@@ -47,7 +46,6 @@ async function main(): Promise<void> {
 
   const opts = program.opts<{
     outDir: string;
-    db: string;
     target: string;
     baseline: string;
     results: string;
@@ -77,7 +75,6 @@ async function main(): Promise<void> {
     }
   }
   const outDir = resolvePath(opts.outDir);
-  const dbPath = resolvePath(opts.db);
   const resultsPath = resolvePath(opts.results);
   const target = opts.target.toUpperCase();
   const baselines = opts.baseline
@@ -94,36 +91,36 @@ async function main(): Promise<void> {
   console.log("==================================");
   console.log(`PDF:      ${pdfPath}`);
   console.log(`Out dir:  ${outDir}`);
-  console.log(`DB:       ${dbPath}`);
   console.log(`Target:   ${target}`);
   console.log(`Baseline: ${baselines.join(",")}`);
   console.log("");
 
-  // Step 1: Parse EBI PDF -> JSON + SQLite
-  const ebiJsonPath = path.join(outDir, "ebi_holdings.json");
-  console.log(`Step 1/3: Parsing PDF → ${ebiJsonPath} (+SQLite)`);
-  await parsePdfToJson(pdfPath, ebiJsonPath, {
-    analyze: opts.analyze !== false,
-    sqlitePath: dbPath,
-  });
-
-  // Step 2: Fetch baseline ETF holdings -> JSON + SQLite
-  console.log("");
-  console.log(`Step 2/3: Fetching baseline holdings → ${outDir}/*_holdings.json (+SQLite)`);
-  const { outputs } = await fetchAndStoreManyEtfHoldings(baselines, {
-    outDir,
-    sqlitePath: dbPath,
-    apiKey: opts.apiKey,
-  });
-  for (const o of outputs) console.log(`✅ ${o.symbol} → ${o.jsonPath}`);
-
-  // Step 3: Run approximation from DB -> results JSON
-  console.log("");
-  console.log(`Step 3/3: Running approximation → ${resultsPath}`);
-  ensureParentDir(resultsPath);
-
-  const db = openHoldingsDb(dbPath);
+  // Open database connection once for all operations
+  const db = await openHoldingsDb();
   try {
+    // Step 1: Parse EBI PDF -> JSON + Turso
+    const ebiJsonPath = path.join(outDir, "ebi_holdings.json");
+    console.log(`Step 1/3: Parsing PDF → ${ebiJsonPath} (+Turso)`);
+    await parsePdfToJson(pdfPath, ebiJsonPath, {
+      analyze: opts.analyze !== false,
+      db,
+    });
+
+    // Step 2: Fetch baseline ETF holdings -> JSON + Turso
+    console.log("");
+    console.log(`Step 2/3: Fetching baseline holdings → ${outDir}/*_holdings.json (+Turso)`);
+    const { outputs } = await fetchAndStoreManyEtfHoldings(baselines, {
+      outDir,
+      db,
+      apiKey: opts.apiKey,
+    });
+    for (const o of outputs) console.log(`✅ ${o.symbol} → ${o.jsonPath}`);
+
+    // Step 3: Run approximation from DB -> results JSON
+    console.log("");
+    console.log(`Step 3/3: Running approximation → ${resultsPath}`);
+    ensureParentDir(resultsPath);
+
     const res = await runApproximation(db, target, baselines, {
       weightField: "actual_weight",
     });

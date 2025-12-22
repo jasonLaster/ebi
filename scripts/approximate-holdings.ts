@@ -20,9 +20,8 @@ async function main(): Promise<void> {
   program
     .name("approximate-holdings")
     .description(
-      "Approximate an ETF's holdings using baseline ETFs, using weights from SQLite holdings DB"
+      "Approximate an ETF's holdings using baseline ETFs, using weights from Turso SQLite holdings DB"
     )
-    .option("--db <path>", "Path to SQLite db", "data/holdings.db")
     .option("--target <symbol>", "Target ETF to approximate", "EBI")
     .option(
       "--baseline <symbols>",
@@ -43,7 +42,6 @@ async function main(): Promise<void> {
     .parse(process.argv);
 
   const opts = program.opts<{
-    db: string;
     target: string;
     baseline: string;
     weightField: string;
@@ -51,7 +49,6 @@ async function main(): Promise<void> {
     maxIterations: string;
   }>();
 
-  const dbPath = resolvePath(opts.db);
   const outPath = resolvePath(opts.out);
   const target = opts.target.toUpperCase();
   const baselineEtfs = opts.baseline
@@ -64,7 +61,7 @@ async function main(): Promise<void> {
     opts.weightField === "weight" ? "weight" : ("actual_weight" as const);
   const maxIterations = Number(opts.maxIterations);
 
-  const db = openHoldingsDb(dbPath);
+  const db = await openHoldingsDb();
   try {
     const results = await runApproximation(db, target, baselineEtfs, {
       weightField,

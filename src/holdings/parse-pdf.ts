@@ -1,14 +1,17 @@
 import * as fs from "fs";
 import { PDFParse as PdfParse } from "pdf-parse";
 import { Holding, HoldingsData } from "../lib/types";
-import { HoldingsDb } from "../lib/db";
+import { HoldingsDb, openHoldingsDb } from "../lib/db";
 import { writeHoldingsOutputs, resolvePath } from "./storage";
 
 export type Logger = Pick<typeof console, "log" | "warn" | "error">;
 
 function noop(): void {}
 
-export function getLogger(opts?: { silent?: boolean; logger?: Logger }): Logger {
+export function getLogger(opts?: {
+  silent?: boolean;
+  logger?: Logger;
+}): Logger {
   if (opts?.logger) return opts.logger;
   if (opts?.silent) return { log: noop, warn: noop, error: noop };
   return console;
@@ -99,7 +102,12 @@ export function parseHoldingsFromText(
     const shares = parseFloat(parts[parts.length - 4].replace(/,/g, ""));
     const companyName = parts.slice(0, cusipIndex).join(" ");
 
-    if (ticker && companyName && !Number.isNaN(weight) && !Number.isNaN(marketValue)) {
+    if (
+      ticker &&
+      companyName &&
+      !Number.isNaN(weight) &&
+      !Number.isNaN(marketValue)
+    ) {
       holdings[ticker] = {
         name: companyName,
         weight,
@@ -122,13 +130,20 @@ export function analyzeHoldings(
   const logger = getLogger(opts);
   logger.log("\n=== Holdings Analysis ===");
 
-  const totalWeight = Object.values(holdings).reduce((sum, h) => sum + h.weight, 0);
+  const totalWeight = Object.values(holdings).reduce(
+    (sum, h) => sum + h.weight,
+    0
+  );
   logger.log(`Total weight: ${(totalWeight * 100).toFixed(2)}%`);
 
-  const sorted = Object.entries(holdings).sort(([, a], [, b]) => b.weight - a.weight);
+  const sorted = Object.entries(holdings).sort(
+    ([, a], [, b]) => b.weight - a.weight
+  );
   logger.log("\nTop 10 holdings by weight:");
   sorted.slice(0, 10).forEach(([ticker, data], idx) => {
-    logger.log(`${idx + 1}. ${ticker}: ${data.name} (${(data.weight * 100).toFixed(2)}%)`);
+    logger.log(
+      `${idx + 1}. ${ticker}: ${data.name} (${(data.weight * 100).toFixed(2)}%)`
+    );
   });
 }
 
@@ -155,31 +170,33 @@ export async function parsePdfToJson(
     analyze?: boolean;
     silent?: boolean;
     logger?: Logger;
-    sqlitePath?: string | null;
     db?: HoldingsDb;
   }
 ): Promise<HoldingsData> {
   const data = await parsePdfToHoldingsData(inputPdfPath, opts);
 
-  const sqlitePath =
-    typeof opts?.sqlitePath === "undefined" ? "data/holdings.db" : opts.sqlitePath;
+  const db = opts?.db ?? (await openHoldingsDb());
+  try {
+    const out = await writeHoldingsOutputs(data, {
+      jsonPath: outputJsonPath,
+      db,
+    });
 
-  const out = writeHoldingsOutputs(data, {
-    jsonPath: outputJsonPath,
-    sqlitePath: sqlitePath ?? undefined,
-    db: opts?.db,
-  });
+    if (opts?.analyze !== false) analyzeHoldings(data.holdings, opts);
 
-  if (opts?.analyze !== false) analyzeHoldings(data.holdings, opts);
-
-  const logger = getLogger(opts);
-  if (!opts?.silent) {
-    logger.log(
-      `\n✅ Successfully extracted ${Object.keys(data.holdings).length} holdings from PDF`
-    );
-    logger.log(`📁 JSON file saved to: ${out.jsonPath}`);
+    const logger = getLogger(opts);
+    if (!opts?.silent) {
+      logger.log(
+        `\n✅ Successfully extracted ${Object.keys(data.holdings).length} holdings from PDF`
+      );
+      logger.log(`📁 JSON file saved to: ${out.jsonPath}`);
+    }
+  } finally {
+    if (!opts?.db) {
+      // Only close if we created the connection
+      db.close();
+    }
   }
 
   return data;
 }
-

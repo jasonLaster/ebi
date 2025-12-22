@@ -136,12 +136,10 @@ The system uses holdings data from the SQLite DB and also writes JSON exports:
 ### Common Issues
 
 1. **"Alglib WASM failed to load"**
-
    - Ensure you're using a modern browser with WebAssembly support
    - Check that the Alglib library is properly loaded
 
 2. **"Portfolio approximation results not found"**
-
    - Run the optimization script first: `bun scripts/approximate-holdings.ts`
    - Check that the data files exist in the correct locations
 

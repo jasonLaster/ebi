@@ -92,7 +92,10 @@ export function normalizeFmpHoldingsToMap(
     })
     .filter(Boolean) as { ticker: string; holding: Holding }[];
 
-  const totalMarketValue = rows.reduce((sum, r) => sum + (r.holding.market_value || 0), 0);
+  const totalMarketValue = rows.reduce(
+    (sum, r) => sum + (r.holding.market_value || 0),
+    0
+  );
   const useMarketValue = totalMarketValue > 0;
 
   const holdings: Record<string, Holding> = {};
@@ -107,4 +110,3 @@ export function normalizeFmpHoldingsToMap(
 
   return holdings;
 }
-

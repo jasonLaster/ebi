@@ -132,14 +132,14 @@ export async function runApproximation(
     throw new Error("baselineEtfs must have at least 1 symbol");
   }
 
-  const targetMap = getHoldingsWeightMap(db, target, { weightField });
-  const baselineMaps = baselines.map((s) =>
-    getHoldingsWeightMap(db, s, { weightField })
+  const targetMap = await getHoldingsWeightMap(db, target, { weightField });
+  const baselineMaps = await Promise.all(
+    baselines.map((s) => getHoldingsWeightMap(db, s, { weightField }))
   );
 
   // Use DB tickers as the master universe, but optimization only needs union across these ETFs.
   // Pulling from DB avoids relying on JSON exports and ensures we match what the app uses.
-  const allSymbols = getAllUniqueSymbols(db);
+  const allSymbols = await getAllUniqueSymbols(db);
   const symbols = Array.from(allSymbols).sort();
 
   // Build vectors/matrix.

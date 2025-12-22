@@ -10,23 +10,23 @@ function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "ebi-approx-"));
 }
 
-function writeEtf(dbPath: string, data: HoldingsData): void {
-  const db = openHoldingsDb(dbPath);
-  try {
-    storeHoldingsData(db, data);
-  } finally {
-    db.close();
-  }
+async function writeEtf(db: Awaited<ReturnType<typeof openHoldingsDb>>, data: HoldingsData): Promise<void> {
+  await storeHoldingsData(db, data);
 }
 
-describe("approximation (SQLite-backed)", () => {
+describe("approximation (Turso-backed)", () => {
   test("returns valid weights that satisfy constraints", async () => {
-    const tmp = makeTempDir();
-    const dbPath = path.join(tmp, "holdings.db");
+    // Skip test if Turso credentials are not set
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      return;
+    }
 
-    // Construct a toy problem where EBI is exactly 75% VTI + 25% IWN.
-    // Use actual_weight everywhere (same as weight in this fixture).
-    writeEtf(dbPath, {
+    const db = await openHoldingsDb();
+    try {
+      // Construct a toy problem where EBI is exactly 75% VTI + 25% IWN.
+      // Use actual_weight everywhere (same as weight in this fixture).
+      await writeEtf(db, {
       etfSymbol: "VTI",
       lastUpdated: new Date().toISOString(),
       holdings: {
@@ -49,8 +49,8 @@ describe("approximation (SQLite-backed)", () => {
       },
     });
 
-    writeEtf(dbPath, {
-      etfSymbol: "IWN",
+      await writeEtf(db, {
+        etfSymbol: "IWN",
       lastUpdated: new Date().toISOString(),
       holdings: {
         AAA: {
@@ -72,8 +72,8 @@ describe("approximation (SQLite-backed)", () => {
       },
     });
 
-    writeEtf(dbPath, {
-      etfSymbol: "VTV",
+      await writeEtf(db, {
+        etfSymbol: "VTV",
       lastUpdated: new Date().toISOString(),
       holdings: {
         AAA: {
@@ -95,8 +95,8 @@ describe("approximation (SQLite-backed)", () => {
       },
     });
 
-    writeEtf(dbPath, {
-      etfSymbol: "EBI",
+      await writeEtf(db, {
+        etfSymbol: "EBI",
       lastUpdated: new Date().toISOString(),
       holdings: {
         // 0.75*VTI + 0*VTV + 0.25*IWN:
@@ -121,8 +121,6 @@ describe("approximation (SQLite-backed)", () => {
       },
     });
 
-    const db = openHoldingsDb(dbPath);
-    try {
       const res = await runApproximation(db, "EBI", ["VTI", "VTV", "IWN"], {
         weightField: "actual_weight",
         initialGuess: [0.75, 0.1, 0.15],
@@ -142,25 +140,29 @@ describe("approximation (SQLite-backed)", () => {
   });
 
   test("throws if baselineEtfs is empty", async () => {
-    const tmp = makeTempDir();
-    const dbPath = path.join(tmp, "holdings.db");
-    writeEtf(dbPath, {
-      etfSymbol: "EBI",
-      lastUpdated: new Date().toISOString(),
-      holdings: {
-        AAA: {
-          name: "AAA",
-          weight: 1,
-          actual_weight: 1,
-          market_value: 1,
-          price: 1,
-          shares: 1,
-        },
-      },
-    });
+    // Skip test if Turso credentials are not set
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      return;
+    }
 
-    const db = openHoldingsDb(dbPath);
+    const db = await openHoldingsDb();
     try {
+      await writeEtf(db, {
+        etfSymbol: "EBI",
+        lastUpdated: new Date().toISOString(),
+        holdings: {
+          AAA: {
+            name: "AAA",
+            weight: 1,
+            actual_weight: 1,
+            market_value: 1,
+            price: 1,
+            shares: 1,
+          },
+        },
+      });
+
       await expect(runApproximation(db, "EBI", [])).rejects.toThrow(
         /baselineEtfs must have at least 1 symbol/
       );

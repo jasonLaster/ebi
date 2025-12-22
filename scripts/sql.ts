@@ -1,21 +1,19 @@
 #!/usr/bin/env bun
-import { Database } from "bun:sqlite";
+import "dotenv/config";
+import { createClient } from "@libsql/client";
 import { Command } from "commander";
-import * as path from "path";
 
 async function main(): Promise<void> {
   const program = new Command();
 
   program
     .name("sql")
-    .description("Run arbitrary SQL queries against the SQLite database")
-    .option("--db <path>", "Path to SQLite db", "data/holdings.db")
+    .description("Run arbitrary SQL queries against the Turso SQLite database")
     .option("--json", "Output as JSON", false)
-    .option("--readonly", "Open database in readonly mode", true)
     .argument("[query]", "SQL query to execute (or pipe via stdin)")
     .parse(process.argv);
 
-  const opts = program.opts<{ db: string; json: boolean; readonly: boolean }>();
+  const opts = program.opts<{ json: boolean }>();
   const [argQuery] = program.args;
 
   // Get query from argument or stdin
@@ -30,21 +28,38 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const dbPath = path.isAbsolute(opts.db)
-    ? opts.db
-    : path.resolve(process.cwd(), opts.db);
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  const db = new Database(dbPath, { readonly: opts.readonly });
+  if (!url) {
+    console.error("Error: TURSO_DATABASE_URL environment variable is not set");
+    process.exit(1);
+  }
+  if (!authToken) {
+    console.error("Error: TURSO_AUTH_TOKEN environment variable is not set");
+    process.exit(1);
+  }
+
+  const client = createClient({ url, authToken });
 
   try {
     // Check if it's a SELECT/read query
     const isSelect = /^\s*(SELECT|PRAGMA|EXPLAIN|WITH)\b/i.test(query);
 
     if (isSelect) {
-      const rows = db.query(query).all();
+      const result = await client.execute({ sql: query });
+      const rows = result.rows;
 
       if (opts.json) {
-        console.log(JSON.stringify(rows, null, 2));
+        // Convert rows to plain objects
+        const plainRows = rows.map((row) => {
+          const obj: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(row)) {
+            obj[key] = value;
+          }
+          return obj;
+        });
+        console.log(JSON.stringify(plainRows, null, 2));
         return;
       }
 
@@ -54,9 +69,10 @@ async function main(): Promise<void> {
       }
 
       // Pretty print as table
-      const columns = Object.keys(rows[0] as Record<string, unknown>);
+      const firstRow = rows[0];
+      const columns = Object.keys(firstRow);
       const widths = columns.map((col) => {
-        const values = rows.map((r) => String((r as Record<string, unknown>)[col] ?? ""));
+        const values = rows.map((r) => String(r[col] ?? ""));
         return Math.max(col.length, ...values.map((v) => v.length));
       });
 
@@ -69,23 +85,18 @@ async function main(): Promise<void> {
       // Rows
       for (const row of rows) {
         const line = columns
-          .map((c, i) => String((row as Record<string, unknown>)[c] ?? "").padEnd(widths[i]))
+          .map((c, i) => String(row[c] ?? "").padEnd(widths[i]))
           .join("  ");
         console.log(line);
       }
 
       console.log(`\n(${rows.length} row${rows.length === 1 ? "" : "s"})`);
     } else {
-      // For write operations, need to open without readonly
-      if (opts.readonly) {
-        console.error("Error: Write operations require --no-readonly flag");
-        process.exit(1);
-      }
-      const result = db.run(query);
-      console.log(`Changes: ${result.changes}`);
+      const result = await client.execute({ sql: query });
+      console.log(`Changes: ${result.rowsAffected ?? 0}`);
     }
   } finally {
-    db.close();
+    client.close();
   }
 }
 

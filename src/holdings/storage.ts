@@ -12,29 +12,30 @@ export function resolvePath(p: string): string {
   return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
 }
 
-export function writeHoldingsJson(data: HoldingsData, outputJsonPath: string): string {
+export function writeHoldingsJson(
+  data: HoldingsData,
+  outputJsonPath: string
+): string {
   const resolved = resolvePath(outputJsonPath);
   ensureParentDir(resolved);
   fs.writeFileSync(resolved, JSON.stringify(data, null, 2));
   return resolved;
 }
 
-export function writeHoldingsSqlite(
+export async function writeHoldingsSqlite(
   data: HoldingsData,
-  dbOrPath: HoldingsDb | string
-): void {
-  const db = typeof dbOrPath === "string" ? openHoldingsDb(dbOrPath) : dbOrPath;
-  storeHoldingsData(db, data);
-  if (typeof dbOrPath === "string") db.close();
+  db: HoldingsDb
+): Promise<void> {
+  await storeHoldingsData(db, data);
 }
 
-export function writeHoldingsOutputs(
+export async function writeHoldingsOutputs(
   data: HoldingsData,
-  opts: { jsonPath: string; sqlitePath?: string; db?: HoldingsDb }
-): { jsonPath: string } {
+  opts: { jsonPath: string; db?: HoldingsDb }
+): Promise<{ jsonPath: string }> {
   const jsonPath = writeHoldingsJson(data, opts.jsonPath);
-  const dbToUse = opts.db ?? opts.sqlitePath;
-  if (dbToUse) writeHoldingsSqlite(data, dbToUse);
+  if (opts.db) {
+    await writeHoldingsSqlite(data, opts.db);
+  }
   return { jsonPath };
 }
-
