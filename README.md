@@ -97,6 +97,9 @@ ebi/
 │   │   └── iwn_holdings.json    # IWN holdings
 │   └── portfolio_approximation_results.json # Optimization results
 ├── scripts/                     # Analysis scripts
+│   ├── parse-pdf.ts             # PDF holdings parser (extracts and parses PDF to JSON)
+│   ├── parse-pdf.test.ts        # Tests for PDF parsing
+│   ├── extract_pdf_holdings.js  # PDF text extraction utility
 │   ├── approximate_holdings.js  # Main optimization script
 │   ├── run-approximation.sh     # Convenience script
 │   └── vendor/                  # Third-party libraries
@@ -106,6 +109,21 @@ ebi/
 
 ## 🔧 Scripts
 
+### PDF Parsing
+
+Parse PDF holdings files into JSON format:
+
+```bash
+# Parse a PDF holdings file
+bun scripts/parse-pdf.ts <input-pdf-path> <output-json-path>
+
+# Example:
+bun scripts/parse-pdf.ts in/holdings.pdf data/ebi_holdings.json
+
+# Or use the npm script:
+bun run parse:pdf in/holdings.pdf data/ebi_holdings.json
+```
+
 ### Portfolio Approximation
 
 ```bash
@@ -114,6 +132,16 @@ ebi/
 
 # Or run directly
 node scripts/approximate_holdings.js
+```
+
+### Testing
+
+```bash
+# Run all tests
+bun test
+
+# Run holdings validation tests
+bun test:holdings
 ```
 
 ### Development
