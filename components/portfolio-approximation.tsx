@@ -10,11 +10,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  RefreshCw,
-  TrendingUp,
-  AlertTriangle,
-} from "lucide-react";
+import { RefreshCw, TrendingUp, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface PortfolioApproximationData {
@@ -77,7 +73,10 @@ export function PortfolioApproximation() {
       setError(null);
     } catch (err) {
       console.error("Failed to fetch portfolio approximation data:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to load data. Please run the approximation script first.";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to load data. Please run the approximation script first.";
       setError(errorMessage);
     } finally {
       setLoading(false);

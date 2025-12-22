@@ -18,7 +18,9 @@ describe("EBI Holdings Validation", () => {
   test("Load holdings JSON file", () => {
     const filePath = path.join(__dirname, "../data/ebi_holdings.json");
     if (!fs.existsSync(filePath)) {
-      console.warn(`Skipping test: Holdings JSON file not found at ${filePath}`);
+      console.warn(
+        `Skipping test: Holdings JSON file not found at ${filePath}`
+      );
       return;
     }
 
@@ -145,7 +147,9 @@ describe("parsePdfToJson function", () => {
 
     // Skip test if Turso credentials are not set
     if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      console.log(
+        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
+      );
       return;
     }
 
@@ -161,17 +165,17 @@ describe("parsePdfToJson function", () => {
       // Verify output file was created
       expect(fs.existsSync(testOutputPath)).toBe(true);
 
-    // Verify result structure
-    expect(result).toBeDefined();
-    expect(result.etfSymbol).toBe("EBI");
-    expect(result.holdings).toBeDefined();
-    expect(Object.keys(result.holdings).length).toBeGreaterThan(0);
+      // Verify result structure
+      expect(result).toBeDefined();
+      expect(result.etfSymbol).toBe("EBI");
+      expect(result.holdings).toBeDefined();
+      expect(Object.keys(result.holdings).length).toBeGreaterThan(0);
 
-    // Verify output file content matches result
-    const fileContent = fs.readFileSync(testOutputPath, "utf-8");
-    const fileData: HoldingsData = JSON.parse(fileContent);
-    expect(fileData.etfSymbol).toBe(result.etfSymbol);
-    expect(fileData.holdings).toEqual(result.holdings);
+      // Verify output file content matches result
+      const fileContent = fs.readFileSync(testOutputPath, "utf-8");
+      const fileData: HoldingsData = JSON.parse(fileContent);
+      expect(fileData.etfSymbol).toBe(result.etfSymbol);
+      expect(fileData.holdings).toEqual(result.holdings);
 
       // Verify specific holdings are present
       expect(result.holdings["AA"]).toBeDefined();
@@ -214,7 +218,9 @@ describe("parsePdfToJson function", () => {
 
     // Skip test if Turso credentials are not set
     if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log("Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set");
+      console.log(
+        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
+      );
       return;
     }
 

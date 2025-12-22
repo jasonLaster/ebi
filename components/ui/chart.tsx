@@ -115,7 +115,10 @@ type ChartTooltipContentProps = React.ComponentProps<"div"> & {
   active?: boolean;
   payload?: ChartTooltipPayload[];
   label?: unknown;
-  labelFormatter?: (label: unknown, payload: ChartTooltipPayload[]) => React.ReactNode;
+  labelFormatter?: (
+    label: unknown,
+    payload: ChartTooltipPayload[]
+  ) => React.ReactNode;
   formatter?: (
     value: unknown,
     name: unknown,
@@ -212,9 +215,12 @@ const ChartTooltipContent = React.forwardRef<
           {payload.map((item: ChartTooltipPayload, index: number) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const payloadFill = item.payload && typeof item.payload === 'object' && 'fill' in item.payload 
-              ? (item.payload as { fill?: string }).fill 
-              : undefined;
+            const payloadFill =
+              item.payload &&
+              typeof item.payload === "object" &&
+              "fill" in item.payload
+                ? (item.payload as { fill?: string }).fill
+                : undefined;
             const indicatorColor = color || payloadFill || item.color;
 
             return (
@@ -226,7 +232,13 @@ const ChartTooltipContent = React.forwardRef<
                 )}
               >
                 {formatter && item?.value !== undefined && item.name ? (
-                  formatter(item.value, item.name, item, index, item.payload as ChartTooltipPayload)
+                  formatter(
+                    item.value,
+                    item.name,
+                    item,
+                    index,
+                    item.payload as ChartTooltipPayload
+                  )
                 ) : (
                   <>
                     {itemConfig?.icon ? (

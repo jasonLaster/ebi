@@ -181,7 +181,7 @@ export async function runApproximation(
     if (!weights || weights.length === 0) {
       throw new Error("Optimization returned no results");
     }
-    
+
     const finalObjectiveValue = objectiveFunction(weights);
     const metrics = computeMetrics(
       H_target,

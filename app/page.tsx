@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CartesianGrid,
   Legend,
@@ -746,7 +741,12 @@ export default function ETFDashboard() {
                 </TabsList>
 
                 <TabsContent value="percentageChange" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={300}
+                  >
                     <LineChart
                       data={combinedData}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -936,7 +936,12 @@ export default function ETFDashboard() {
                 </TabsContent>
 
                 <TabsContent value="percentageDelta" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={300}
+                  >
                     <LineChart
                       data={combinedData.filter(
                         (d) =>
