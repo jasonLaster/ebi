@@ -18,7 +18,6 @@ async function main(): Promise<void> {
     .argument("[symbols...]", "ETF symbols to fetch (e.g. VTI VTV IWN)")
     .option("--all", "Fetch baseline ETFs (VTI, VTV, IWN)")
     .option("-o, --out-dir <dir>", "Output directory for JSON files", "data")
-    .option()
     .option("--api-key <key>", "Override FMP_API_KEY env var")
     .action(async (symbols: string[], options) => {
       const picked = new Set<string>();

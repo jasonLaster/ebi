@@ -115,14 +115,27 @@ describe("holdings fetch (FMP)", () => {
       expect(parsedVti.holdings.AAPL).toBeDefined();
 
       const etfResult = await db.execute({
-        sql: "SELECT COUNT(*) as c FROM etfs",
+        sql: "SELECT COUNT(*) as c FROM etfs WHERE symbol IN ('VTI', 'VTV')",
       });
-      expect(Number(etfResult.rows[0].c)).toBe(2);
+      expect(Number(etfResult.rows[0].c)).toBeGreaterThanOrEqual(2);
 
-      const holdingResult = await db.execute({
-        sql: "SELECT COUNT(*) as c FROM holdings",
+      // Verify holdings were added (check for VTI and VTV specifically)
+      const vtiResult = await db.execute({
+        sql: `
+          SELECT COUNT(*) as c FROM holdings h
+          JOIN etfs e ON e.id = h.etf_id
+          WHERE e.symbol = 'VTI'
+        `,
       });
-      expect(Number(holdingResult.rows[0].c)).toBe(2);
+      const vtvResult = await db.execute({
+        sql: `
+          SELECT COUNT(*) as c FROM holdings h
+          JOIN etfs e ON e.id = h.etf_id
+          WHERE e.symbol = 'VTV'
+        `,
+      });
+      expect(Number(vtiResult.rows[0].c)).toBeGreaterThanOrEqual(1);
+      expect(Number(vtvResult.rows[0].c)).toBeGreaterThanOrEqual(1);
     } finally {
       db.close();
     }

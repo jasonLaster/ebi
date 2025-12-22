@@ -140,8 +140,8 @@ describe("parsePdfToJson function", () => {
         db,
       });
 
-    // Verify output file was created
-    expect(fs.existsSync(testOutputPath)).toBe(true);
+      // Verify output file was created
+      expect(fs.existsSync(testOutputPath)).toBe(true);
 
     // Verify result structure
     expect(result).toBeDefined();
@@ -155,17 +155,14 @@ describe("parsePdfToJson function", () => {
     expect(fileData.etfSymbol).toBe(result.etfSymbol);
     expect(fileData.holdings).toEqual(result.holdings);
 
-    // Verify specific holdings are present
-    expect(result.holdings["AA"]).toBeDefined();
-    expect(result.holdings["AA"].name).toBe("Alcoa Corp");
-    expect(result.holdings["AAMI"]).toBeDefined();
-    expect(result.holdings["AAMI"].name).toBe("Acadian Asset Management Inc");
+      // Verify specific holdings are present
+      expect(result.holdings["AA"]).toBeDefined();
+      expect(result.holdings["AA"].name).toBe("Alcoa Corp");
+      expect(result.holdings["AAMI"]).toBeDefined();
+      expect(result.holdings["AAMI"].name).toBe("Acadian Asset Management Inc");
 
-    // Verify DB has rows for EBI
-    const { openHoldingsDb } = await import("../src/lib/db");
-    const db = await openHoldingsDb();
-    try {
-      const result = await db.execute({
+      // Verify DB has rows for EBI
+      const dbResult = await db.execute({
         sql: `
           SELECT e.symbol as symbol, COUNT(*) as n
           FROM holdings h
@@ -174,8 +171,8 @@ describe("parsePdfToJson function", () => {
           GROUP BY e.symbol
         `,
       });
-      expect(result.rows.length).toBeGreaterThan(0);
-      expect(Number(result.rows[0].n)).toBeGreaterThan(0);
+      expect(dbResult.rows.length).toBeGreaterThan(0);
+      expect(Number(dbResult.rows[0].n)).toBeGreaterThan(0);
     } finally {
       db.close();
     }

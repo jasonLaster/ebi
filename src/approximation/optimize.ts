@@ -1,10 +1,9 @@
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import {
   HoldingsDb,
   getHoldingsWeightMap,
   getAllUniqueSymbols,
 } from "../lib/db";
+import { Alglib } from "./alglib.js";
 
 export interface OptimizationMetrics {
   finalObjectiveValue: number;
@@ -30,39 +29,7 @@ export interface ApproximationResult {
   };
 }
 
-type AlglibCtor = new () => {
-  promise: Promise<void>;
-  add_function: (fn: (x: number[]) => number) => void;
-  add_equality_constraint: (fn: (x: number[]) => number) => void;
-  add_less_than_or_equal_to_constraint: (fn: (x: number[]) => number) => void;
-  solve: (
-    mode: "min" | "max",
-    x0: number[],
-    s0: unknown[],
-    maxits: number,
-    epsx: number,
-    epsf: number,
-    epsg: number,
-    epsg2: number
-  ) => boolean;
-  get_results: () => number[];
-  get_status: () => unknown;
-  remove: () => void;
-};
-
-async function loadAlglib(): Promise<{ Alglib: AlglibCtor }> {
-  // The vendor wrapper expects these globals.
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  (globalThis as unknown as { __filename?: string }).__filename = __filename;
-  (globalThis as unknown as { __dirname?: string }).__dirname = __dirname;
-
-  const modUrl = new URL(
-    "../../scripts/vendor/Alglib-v1.1.0.js",
-    import.meta.url
-  );
-  return (await import(modUrl.href)) as { Alglib: AlglibCtor };
-}
+type AlglibCtor = typeof Alglib;
 
 function computeMetrics(
   H_target: number[],
@@ -154,7 +121,6 @@ export async function runApproximation(
   const nStocks = symbols.length;
   if (nStocks === 0) throw new Error("No symbols found in DB holdings");
 
-  const { Alglib } = await loadAlglib();
   const alglib = new Alglib();
 
   const initialGuess =
@@ -185,19 +151,19 @@ export async function runApproximation(
 
     // weights must sum to 1
     alglib.add_equality_constraint(
-      (w) => w.reduce((sum, x) => sum + x, 0) - 1.0
+      (w: number[]) => w.reduce((sum: number, x: number) => sum + x, 0) - 1.0
     );
 
     // 0 <= w_i <= 1
     for (let j = 0; j < baselines.length; j++) {
-      alglib.add_less_than_or_equal_to_constraint((w) => -w[j]);
-      alglib.add_less_than_or_equal_to_constraint((w) => w[j] - 1.0);
+      alglib.add_less_than_or_equal_to_constraint((w: number[]) => -w[j]);
+      alglib.add_less_than_or_equal_to_constraint((w: number[]) => w[j] - 1.0);
     }
 
     const ok = alglib.solve(
       "min",
       initialGuess,
-      [],
+      [] as unknown[],
       opts?.maxIterations ?? 5000,
       100.0,
       0.01,
@@ -212,6 +178,10 @@ export async function runApproximation(
     }
 
     const weights = alglib.get_results();
+    if (!weights || weights.length === 0) {
+      throw new Error("Optimization returned no results");
+    }
+    
     const finalObjectiveValue = objectiveFunction(weights);
     const metrics = computeMetrics(
       H_target,
@@ -224,11 +194,11 @@ export async function runApproximation(
     const optimalWeights: Record<string, number> = {};
     const weightsPercentages: Record<string, number> = {};
     for (let i = 0; i < baselines.length; i++) {
-      optimalWeights[baselines[i].toLowerCase()] = weights[i];
-      weightsPercentages[baselines[i].toLowerCase()] = weights[i] * 100;
+      optimalWeights[baselines[i].toLowerCase()] = weights[i] ?? 0;
+      weightsPercentages[baselines[i].toLowerCase()] = (weights[i] ?? 0) * 100;
     }
 
-    const weightsSum = weights.reduce((sum, w) => sum + w, 0);
+    const weightsSum = weights.reduce((sum: number, w: number) => sum + w, 0);
 
     return {
       timestamp: new Date().toISOString(),
