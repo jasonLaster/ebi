@@ -23,7 +23,10 @@ export async function downloadHoldingsPdf(
 
   // Generate timestamp for filename if not provided
   if (!outputPath) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .slice(0, -5);
     const filename = `ebi-holdings-${timestamp}.pdf`;
     outputPath = path.resolve(process.cwd(), "in", filename);
   } else {
@@ -149,7 +152,7 @@ export async function downloadHoldingsPdf(
       fs.unlinkSync(tempZipPath);
 
       console.log(`✅ PDF saved successfully to: ${outputPath}`);
-      
+
       return outputPath;
     } finally {
       // Clean up the session

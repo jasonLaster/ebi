@@ -10,6 +10,7 @@ import {
 import {
   CartesianGrid,
   Legend,
+  Line,
   LineChart,
   ResponsiveContainer,
   Tooltip,
@@ -24,7 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Area, ReferenceLine } from "recharts";
+import { ReferenceLine } from "recharts";
 import React, { useEffect, useState, useMemo } from "react";
 import { PortfolioApproximation } from "@/components/portfolio-approximation";
 import { PortfolioComparison } from "@/components/portfolio-comparison";
@@ -735,7 +736,7 @@ export default function ETFDashboard() {
                 </TabsList>
 
                 <TabsContent value="percentageChange" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
                     <LineChart
                       data={combinedData}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -847,13 +848,11 @@ export default function ETFDashboard() {
                       <Legend />
                       {combinedData[0]?.EBI_norm !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="EBI"
                             dataKey="EBI_norm"
                             stroke="#8884d8"
-                            fillOpacity={1}
-                            fill="url(#colorEBI)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -863,13 +862,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.IWN_norm !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="IWN"
                             dataKey="IWN_norm"
                             stroke="#ff7300"
-                            fillOpacity={1}
-                            fill="url(#colorIWN)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -879,13 +876,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.VTV_norm !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="VTV"
                             dataKey="VTV_norm"
                             stroke="#387908"
-                            fillOpacity={1}
-                            fill="url(#colorVTV)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -895,13 +890,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.VTI_norm !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="VTI"
                             dataKey="VTI_norm"
                             stroke="#82ca9d"
-                            fillOpacity={1}
-                            fill="url(#colorVTI)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -911,13 +904,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.IWV_norm !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="IWV (Benchmark)"
                             dataKey="IWV_norm"
                             stroke="#ffc658"
-                            fillOpacity={1}
-                            fill="url(#colorIWV)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -935,7 +926,7 @@ export default function ETFDashboard() {
                 </TabsContent>
 
                 <TabsContent value="percentageDelta" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
                     <LineChart
                       data={combinedData.filter(
                         (d) =>
@@ -1017,13 +1008,11 @@ export default function ETFDashboard() {
                       <Legend />
                       {combinedData[0]?.EBI_delta_IWV !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="EBI vs IWV"
                             dataKey="EBI_delta_IWV"
                             stroke="#8884d8"
-                            fillOpacity={1}
-                            fill="url(#colorEBIDelta)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -1033,13 +1022,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.IWN_delta_IWV !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="IWN vs IWV"
                             dataKey="IWN_delta_IWV"
                             stroke="#ff7300"
-                            fillOpacity={1}
-                            fill="url(#colorIWNDelta)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -1049,13 +1036,11 @@ export default function ETFDashboard() {
                       )}
                       {combinedData[0]?.VTV_delta_IWV !== undefined && (
                         <>
-                          <Area
+                          <Line
                             type="monotone"
                             name="VTV vs IWV"
                             dataKey="VTV_delta_IWV"
                             stroke="#387908"
-                            fillOpacity={1}
-                            fill="url(#colorVTVDelta)"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}

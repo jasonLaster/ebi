@@ -42,6 +42,16 @@ export function ensureSchema(db: HoldingsDb): void {
       FOREIGN KEY(etf_id) REFERENCES etfs(id) ON DELETE CASCADE
     );
 
+    -- Stores computed API responses that are valid for a given day.
+    CREATE TABLE IF NOT EXISTS performance_cache (
+      cache_key TEXT PRIMARY KEY,
+      asof_date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_performance_cache_asof_date
+      ON performance_cache(asof_date);
+
     CREATE INDEX IF NOT EXISTS idx_holdings_etf_id ON holdings(etf_id);
     CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker);
   `);

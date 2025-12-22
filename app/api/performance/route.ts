@@ -5,6 +5,8 @@ console.log("[EBI API] route.ts loaded");
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
 
+export const runtime = "nodejs";
+
 interface HistoricalPriceData {
   date: string;
   open: number;
@@ -33,6 +35,10 @@ interface PerformanceResult {
 
 const API_BASE_URL =
   "https://financialmodelingprep.com/api/v3/historical-price-full";
+
+function isoDateUTC(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
 
 async function getHistoricalData(
   symbol: string,
@@ -152,7 +158,7 @@ export async function GET() {
 
   const symbolsToCompare = ["EBI", "VTI", "IWV", "IWN", "VTV"];
   const startDateStr = "2025-03-01";
-  const endDateStr = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
+  const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
 
   const results: PerformanceResult[] = [];
   const allHistoricalData: {
@@ -167,9 +173,10 @@ export async function GET() {
     );
 
     if (historicalDataArray.length > 0) {
-      allHistoricalData[symbol.toLowerCase()] = historicalDataArray.map(
-        (d) => ({ date: d.date, close: d.close })
-      );
+      allHistoricalData[symbol.toLowerCase()] = historicalDataArray.map((d) => ({
+        date: d.date,
+        close: d.close,
+      }));
       const performanceData = calculatePerformance(
         symbol,
         historicalDataArray,
