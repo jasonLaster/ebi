@@ -1,4 +1,4 @@
-name: Test Sync Endpoint
+name: Test Sync Endpoint 2
 
 on:
   push:
@@ -8,8 +8,7 @@ jobs:
   test-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10 # Full sync can take time
-    environment: ci # or 'staging', 'development', etc.
-    if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '' }}
+    environment: ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,12 +21,6 @@ jobs:
         with:
           vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel_team_id: ${{ secrets.VERCEL_TEAM_ID || '' }}
-
-      - name: Wait for deployment to be ready
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 120 # Additional wait time
 
       - name: Test sync endpoint
         id: test_sync
