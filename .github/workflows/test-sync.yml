@@ -1,0 +1,83 @@
+name: Test Sync Endpoint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # Full sync can take time
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get Vercel Preview URL
+        uses: zentered/vercel-preview-url@v1.1.9
+        id: vercel_preview
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel_team_id: ${{ secrets.VERCEL_TEAM_ID || '' }}
+          max_wait_time: 300 # Wait up to 5 minutes for deployment
+
+      - name: Wait for deployment to be ready
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 120 # Additional wait time
+
+      - name: Test sync endpoint
+        id: test_sync
+        run: |
+          PREVIEW_URL="${{ steps.vercel_preview.outputs.preview_url }}"
+          echo "Testing sync endpoint at: https://${PREVIEW_URL}/api/sync"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "https://${PREVIEW_URL}/api/sync" --max-time 180)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          # Verify HTTP status
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Sync endpoint returned status $HTTP_CODE"
+            exit 1
+          fi
+
+          # Verify JSON response
+          SUCCESS=$(echo "$BODY" | jq -r '.success // false')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Sync endpoint returned success=false"
+            echo "$BODY" | jq '.'
+            exit 1
+          fi
+
+          # Verify required fields
+          TARGET=$(echo "$BODY" | jq -r '.targetEtf // ""')
+          if [ "$TARGET" != "EBI" ]; then
+            echo "❌ Expected targetEtf=EBI, got $TARGET"
+            exit 1
+          fi
+
+          # Verify optimization metrics exist
+          IMPROVEMENT=$(echo "$BODY" | jq -r '.optimizationMetrics.improvementPercent // "missing"')
+          if [ "$IMPROVEMENT" == "missing" ]; then
+            echo "❌ Missing optimizationMetrics.improvementPercent"
+            exit 1
+          fi
+
+          echo "✅ Sync endpoint test passed!"
+          echo "Improvement: ${IMPROVEMENT}%"
+
+      - name: Report results
+        if: always()
+        run: |
+          if [ "${{ steps.test_sync.outcome }}" == "success" ]; then
+            echo "✅ Sync endpoint test completed successfully"
+          else
+            echo "❌ Sync endpoint test failed"
+            exit 1
+          fi
