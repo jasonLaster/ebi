@@ -1,14 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
 import { openHoldingsDb, storeHoldingsData } from "../src/lib/db";
 import type { HoldingsData } from "../src/lib/types";
 import { runApproximation } from "../src/approximation/optimize";
-
-function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "ebi-approx-"));
-}
 
 async function writeEtf(db: Awaited<ReturnType<typeof openHoldingsDb>>, data: HoldingsData): Promise<void> {
   await storeHoldingsData(db, data);

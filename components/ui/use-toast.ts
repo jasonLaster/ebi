@@ -32,7 +32,9 @@ function genId() {
   return count.toString()
 }
 
-type ActionType = typeof actionTypes
+type ActionType = typeof actionTypes;
+// Used only for type inference
+void actionTypes;
 
 type Action =
   | {

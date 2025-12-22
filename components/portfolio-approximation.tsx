@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import {
   RefreshCw,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -76,12 +75,10 @@ export function PortfolioApproximation() {
       const result: PortfolioApproximationData = await response.json();
       setData(result);
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch portfolio approximation data:", err);
-      setError(
-        err.message ||
-          "Failed to load data. Please run the approximation script first."
-      );
+      const errorMessage = err instanceof Error ? err.message : "Failed to load data. Please run the approximation script first.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);

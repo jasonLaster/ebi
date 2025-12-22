@@ -29,7 +29,7 @@ export interface ApproximationResult {
   };
 }
 
-type AlglibCtor = typeof Alglib;
+// AlglibCtor type removed - not used
 
 function computeMetrics(
   H_target: number[],

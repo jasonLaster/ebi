@@ -5,7 +5,7 @@ import type React from "react"
 import { cn } from "@/lib/utils"
 
 interface ChartWrapperProps {
-  content: React.ComponentType<any>
+  content: React.ComponentType<Record<string, never>>
   className?: string
   title?: string
 }

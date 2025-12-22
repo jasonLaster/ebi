@@ -71,7 +71,6 @@ function parseHoldingsFromText(text) {
 
   // Look for patterns that might indicate holdings data
   const holdings = {};
-  let inHoldingsSection = false;
   let lineCount = 0;
 
   for (const line of lines) {
@@ -86,7 +85,6 @@ function parseHoldingsFromText(text) {
       console.log(
         `Found potential holdings header at line ${lineCount}: ${line}`
       );
-      inHoldingsSection = true;
       continue;
     }
 

@@ -1,14 +1,15 @@
 name: Test Sync Endpoint
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches: ["*"]
 
 jobs:
   test-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10 # Full sync can take time
-    if: secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != ''
+    environment: ci # or 'staging', 'development', etc.
+    if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

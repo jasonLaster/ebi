@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 /// <reference types="node" />
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { describe, test, expect, afterAll } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
