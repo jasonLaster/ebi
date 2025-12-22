@@ -1,23 +1,19 @@
-name: Test Sync Endpoint 2
+name: Test Sync Endpoint
 
 # This workflow tests the sync endpoint on Vercel deployments.
-# - Pull requests: Automatically gets preview URL from Vercel
-# - repository_dispatch: Uses URL from Vercel webhook event
-# - workflow_dispatch: Manual trigger with optional URL input
+# Note: deployment_status events from GitHub Actions don't include Vercel URLs.
+# For Vercel deployments, use repository_dispatch events from Vercel instead.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   repository_dispatch:
     types:
       - "vercel.deployment.success"
-  workflow_dispatch:
-    inputs:
-      deployment_url:
-        description: "Vercel deployment URL (optional, will use from event if available)"
-        required: false
+  deployment_status:
 
 jobs:
   test-sync:
+    if: |
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10 # Full sync can take time
     environment: ci
@@ -25,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.event.client_payload.git.sha || github.ref }}
+          ref: ${{ github.event.client_payload.git.sha || github.event.deployment.ref || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -35,43 +31,98 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Get Vercel Preview URL (for PRs)
-        if: github.event_name == 'pull_request'
-        uses: zentered/vercel-preview-url@v1.1.9
-        id: vercel_preview
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        with:
-          vercel_project_id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel_team_id: ${{ secrets.VERCEL_TEAM_ID || '' }}
-
-      - name: Wait for deployment to be ready (for PRs)
-        if: github.event_name == 'pull_request'
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 120
+      - name: Debug deployment_status event
+        if: github.event_name == 'deployment_status'
+        run: |
+          echo "=== Deployment Status Event Diagnostics ==="
+          echo ""
+          echo "Event Type: ${{ github.event_name }}"
+          echo "Status State: ${{ github.event.deployment_status.state }}"
+          echo "Environment: ${{ github.event.deployment_status.environment }}"
+          echo ""
+          echo "URLs:"
+          echo "  target_url: ${{ github.event.deployment_status.target_url }}"
+          echo "  environment_url: ${{ github.event.deployment_status.environment_url }}"
+          echo ""
+          echo "Deployment Info:"
+          echo "  ID: ${{ github.event.deployment.id }}"
+          echo "  Ref: ${{ github.event.deployment.ref }}"
+          echo "  SHA: ${{ github.event.deployment.sha }}"
+          echo "  Task: ${{ github.event.deployment.task }}"
+          echo "  Environment: ${{ github.event.deployment.environment }}"
+          echo "  Production: ${{ github.event.deployment.production_environment }}"
+          echo "  Transient: ${{ github.event.deployment.transient_environment }}"
+          echo ""
+          echo "Created By:"
+          echo "  App: ${{ github.event.deployment.performed_via_github_app.name || 'N/A' }}"
+          echo "  User: ${{ github.event.deployment.creator.login }}"
+          echo ""
+          echo "Payload:"
+          echo "${{ toJSON(github.event.deployment.payload) }}"
+          echo ""
+          echo "=== Analysis ==="
+          TARGET_URL="${{ github.event.deployment_status.target_url }}"
+          if [[ "$TARGET_URL" == *"github.com"*"/actions"* ]]; then
+            echo "❌ This deployment_status event is from GitHub Actions, not Vercel"
+            echo "   The target_url points to a GitHub Actions run, not a Vercel deployment"
+          elif [[ "$TARGET_URL" == *"vercel.app"* ]] || [[ "$TARGET_URL" == *"vercel.com"* ]]; then
+            echo "✅ This appears to be a Vercel deployment"
+          else
+            echo "⚠️  Unknown deployment source (target_url: $TARGET_URL)"
+          fi
+          echo ""
+          ENV_URL="${{ github.event.deployment_status.environment_url }}"
+          if [ -z "$ENV_URL" ]; then
+            echo "⚠️  environment_url is empty"
+          else
+            echo "✅ environment_url: $ENV_URL"
+          fi
+          echo ""
+          APP_NAME="${{ github.event.deployment.performed_via_github_app.name }}"
+          if [ "$APP_NAME" == "GitHub Actions" ]; then
+            echo "❌ Deployment was created by GitHub Actions (not Vercel)"
+            echo "   This workflow is triggered by GitHub Actions deployment_status events,"
+            echo "   but Vercel deployments should send repository_dispatch events instead."
+          fi
+          echo ""
+          echo "=== Full Deployment Object ==="
+          echo "${{ toJSON(github.event.deployment) }}"
 
       - name: Get deployment URL
         id: deployment
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            PREVIEW_URL="${{ steps.vercel_preview.outputs.preview_url }}"
-            if [ -z "$PREVIEW_URL" ]; then
-              echo "Error: Could not get Vercel preview URL for PR"
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            # Vercel sends repository_dispatch with the deployment URL
+            DEPLOYMENT_URL="${{ github.event.client_payload.url }}"
+            if [ -z "$DEPLOYMENT_URL" ]; then
+              echo "Error: No URL in repository_dispatch event from Vercel"
               exit 1
             fi
-            DEPLOYMENT_URL="https://${PREVIEW_URL}"
             echo "url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
-            echo "Using preview URL from Vercel: ${DEPLOYMENT_URL}"
-          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
-            DEPLOYMENT_URL="${{ github.event.client_payload.url }}"
+            echo "Using deployment URL from Vercel: ${DEPLOYMENT_URL}"
+          elif [ "${{ github.event_name }}" == "deployment_status" ]; then
+            # deployment_status from GitHub Actions - try to get Vercel URL
+            # Use target_url like v0/Playwright does, but only if it's a valid URL
+            DEPLOYMENT_URL="${{ github.event.deployment_status.target_url }}"
+            
+            # If target_url is a GitHub Actions URL, it's not from Vercel
+            if [[ "$DEPLOYMENT_URL" == *"github.com"*"/actions"* ]]; then
+              echo "Warning: deployment_status event is from GitHub Actions, not Vercel"
+              echo "target_url: ${DEPLOYMENT_URL}"
+              echo "environment_url: ${{ github.event.deployment_status.environment_url }}"
+              echo ""
+              echo "To test Vercel deployments, configure Vercel to send repository_dispatch events"
+              echo "or use the Vercel API to fetch the deployment URL for this branch/ref"
+              exit 1
+            fi
+            
+            if [ -z "$DEPLOYMENT_URL" ]; then
+              echo "Error: No deployment URL found"
+              exit 1
+            fi
+            
             echo "url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
-            echo "Using deployment URL from Vercel event: ${DEPLOYMENT_URL}"
-          elif [ -n "${{ github.event.inputs.deployment_url }}" ]; then
-            DEPLOYMENT_URL="${{ github.event.inputs.deployment_url }}"
-            echo "url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
-            echo "Using deployment URL from workflow input: ${DEPLOYMENT_URL}"
+            echo "Using deployment URL: ${DEPLOYMENT_URL}"
           else
             echo "Error: No deployment URL available"
             exit 1

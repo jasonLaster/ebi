@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "gh:logs": "bun scripts/gh-run-logs.ts",
     "test": "bun test",
     "parse:pdf": "bun scripts/parse-pdf.ts",
     "fetch:holdings": "bun scripts/fetch-holdings.ts",

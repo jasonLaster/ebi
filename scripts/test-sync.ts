@@ -18,7 +18,11 @@ async function testSyncEndpoint(
   url: string,
   timeout: number = 180000
 ): Promise<void> {
-  const endpoint = `${url}/api/sync`;
+  // Check if URL already includes /api/sync path
+  const normalizedUrl = url.replace(/\/$/, "");
+  const endpoint = normalizedUrl.includes("/api/sync")
+    ? normalizedUrl
+    : `${normalizedUrl}/api/sync`;
   console.log(`Testing sync endpoint at: ${endpoint}`);
 
   try {
@@ -33,10 +37,37 @@ async function testSyncEndpoint(
     clearTimeout(timeoutId);
 
     const httpCode = response.status;
+    const contentType = response.headers.get("content-type") || "";
     console.log(`HTTP Status: ${httpCode}`);
+    console.log(`Content-Type: ${contentType}`);
 
-    const body: SyncResponse = await response.json();
-    console.log("Response:", JSON.stringify(body, null, 2));
+    // Get response text first to handle non-JSON responses
+    const responseText = await response.text();
+    
+    // Check if response is HTML (error page)
+    if (contentType.includes("text/html") || responseText.trim().startsWith("<!DOCTYPE")) {
+      console.error(`❌ Server returned HTML error page (status ${httpCode})`);
+      console.error("This usually means the API route threw an unhandled error.");
+      console.error("Check the server logs for the actual error message.");
+      if (httpCode === 500) {
+        console.error("\n💡 Tip: Check Vercel function logs for detailed error information:");
+        console.error("   vercel logs --follow");
+      }
+      process.exit(1);
+    }
+    
+    let body: SyncResponse;
+    try {
+      body = JSON.parse(responseText) as SyncResponse;
+      console.log("Response:", JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error("❌ Failed to parse response as JSON");
+      console.error("Response body (first 500 chars):", responseText.substring(0, 500));
+      if (httpCode !== 200) {
+        console.error(`❌ Sync endpoint returned status ${httpCode}`);
+      }
+      process.exit(1);
+    }
 
     // Verify HTTP status
     if (httpCode !== 200) {
