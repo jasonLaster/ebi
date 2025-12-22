@@ -1,14 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
   },
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Handle pdf-parse and other problematic modules for server-side

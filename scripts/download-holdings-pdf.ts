@@ -2,7 +2,7 @@ import "dotenv/config";
 import { Hyperbrowser } from "@hyperbrowser/sdk";
 import * as fs from "fs";
 import * as path from "path";
-import AdmZip from "adm-zip";
+import AdmZip, { IZipEntry } from "adm-zip";
 
 /**
  * Downloads the latest EBI holdings PDF from Longview Research Partners
@@ -130,14 +130,14 @@ export async function downloadHoldingsPdf(
 
       // Find the PDF file in the zip
       const pdfEntry = zipEntries.find(
-        (entry) =>
+        (entry: IZipEntry) =>
           entry.name.toLowerCase().endsWith(".pdf") && !entry.isDirectory
       );
 
       if (!pdfEntry) {
         throw new Error(
           `No PDF file found in downloads zip. Files found: ${zipEntries
-            .map((e) => e.name)
+            .map((e: IZipEntry) => e.name)
             .join(", ")}`
         );
       }
