@@ -10,9 +10,11 @@
     "lint": "next lint",
     "test": "bun test",
     "test:holdings": "bun test scripts/parse-pdf.test.ts",
+    "test:approx": "bun test scripts/approximate-holdings.test.ts",
     "parse:pdf": "bun scripts/parse-pdf.ts",
     "fetch:holdings": "bun scripts/fetch-holdings.ts",
-    "fetch:all": "bun scripts/fetch-holdings.ts --all"
+    "fetch:all": "bun scripts/fetch-holdings.ts --all",
+    "approximate": "bun scripts/approximate-holdings.ts"
   },
   "author": "",
   "license": "ISC",

@@ -13,15 +13,15 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Check if Node.js is available
-if ! command -v node &> /dev/null; then
-    echo "❌ Error: Node.js is not installed or not in PATH"
+# Check if bun is available
+if ! command -v bun &> /dev/null; then
+    echo "❌ Error: bun is not installed or not in PATH"
     exit 1
 fi
 
 # Check if the approximation script exists
-if [ ! -f "scripts/approximate_holdings.js" ]; then
-    echo "❌ Error: approximation script not found at scripts/approximate_holdings.js"
+if [ ! -f "scripts/approximate-holdings.ts" ]; then
+    echo "❌ Error: approximation script not found at scripts/approximate-holdings.ts"
     exit 1
 fi
 
@@ -29,7 +29,7 @@ echo "📊 Running portfolio approximation optimization..."
 echo "⏱️  This may take a few moments..."
 
 # Run the approximation script
-node scripts/approximate_holdings.js
+bun scripts/approximate-holdings.ts
 
 if [ $? -eq 0 ]; then
     echo "✅ Portfolio approximation completed successfully!"
@@ -56,7 +56,7 @@ if [ $? -eq 0 ]; then
     
     echo ""
     echo "🌐 You can now view the updated results in your web dashboard!"
-    echo "   Run 'pnpm dev' to start the development server"
+    echo "   Run 'bun run dev' to start the development server"
     
 else
     echo "❌ Portfolio approximation failed!"

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-// Helper function to load and process holdings JSON (from approximate_holdings.js)
+// Helper function to load and process holdings JSON
 async function loadHoldings(filePath) {
   const absolutePath = path.resolve(filePath);
   const fileContent = await fs.promises.readFile(absolutePath, "utf8");
@@ -9,8 +9,9 @@ async function loadHoldings(filePath) {
   const holdingsMap = new Map();
   if (data && data.holdings) {
     for (const symbol in data.holdings) {
-      const weight = parseFloat(data.holdings[symbol].weight);
-      holdingsMap.set(symbol, (isNaN(weight) ? 0 : weight) / 100); // Convert percentage to decimal
+      // JSON exports in this repo already store weights as decimals (e.g. 0.0621 = 6.21%).
+      const weight = parseFloat(data.holdings[symbol].actual_weight ?? data.holdings[symbol].weight);
+      holdingsMap.set(symbol, isNaN(weight) ? 0 : weight);
     }
   }
   return holdingsMap;

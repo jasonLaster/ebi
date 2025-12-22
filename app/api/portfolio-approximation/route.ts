@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 
 export async function GET() {
   try {
@@ -59,17 +61,12 @@ export async function GET() {
 export async function POST() {
   try {
     // Trigger a new optimization run
-    const { exec } = require("child_process");
-    const util = require("util");
-    const execAsync = util.promisify(exec);
-
-    const scriptPath = path.join(
-      process.cwd(),
-      "scripts/approximate_holdings.js"
-    );
+    const execFileAsync = promisify(execFile);
 
     console.log("Running portfolio approximation optimization...");
-    const { stdout, stderr } = await execAsync(`node ${scriptPath}`);
+    const { stdout, stderr } = await execFileAsync("bun", [
+      path.join(process.cwd(), "scripts/approximate-holdings.ts"),
+    ]);
 
     if (stderr) {
       console.error("Optimization stderr:", stderr);

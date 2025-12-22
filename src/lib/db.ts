@@ -114,3 +114,55 @@ export function storeHoldingsData(db: HoldingsDb, data: HoldingsData): void {
   upsertHoldingsForEtf(db, etfId, data.holdings);
 }
 
+export function getHoldingsWeightMap(
+  db: HoldingsDb,
+  etfSymbol: string,
+  opts?: { weightField?: "weight" | "actual_weight" }
+): Map<string, number> {
+  const symbol = etfSymbol.toUpperCase();
+  const weightField = opts?.weightField ?? "actual_weight";
+  if (weightField !== "weight" && weightField !== "actual_weight") {
+    throw new Error(`Unsupported weightField: ${String(weightField)}`);
+  }
+
+  const rows = db
+    .prepare(
+      `
+      SELECT h.ticker as ticker, h.${weightField} as weight
+      FROM holdings h
+      JOIN etfs e ON e.id = h.etf_id
+      WHERE e.symbol = $symbol
+      `
+    )
+    .all({ $symbol: symbol }) as { ticker: string; weight: number }[];
+
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const t = (r.ticker ?? "").toString().trim();
+    if (!t) continue;
+    const w = typeof r.weight === "number" ? r.weight : Number(r.weight);
+    map.set(t, Number.isFinite(w) ? w : 0);
+  }
+  return map;
+}
+
+export function getAllUniqueSymbols(db: HoldingsDb): Set<string> {
+  const rows = db
+    .prepare(
+      `
+      SELECT DISTINCT ticker
+      FROM holdings
+      WHERE ticker IS NOT NULL AND ticker != ''
+      ORDER BY ticker
+      `
+    )
+    .all() as { ticker: string }[];
+
+  const s = new Set<string>();
+  for (const r of rows) {
+    const t = (r.ticker ?? "").toString().trim();
+    if (t) s.add(t);
+  }
+  return s;
+}
+

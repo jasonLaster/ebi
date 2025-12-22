@@ -24,7 +24,7 @@ echo "📄 Processing PDF: $PDF_FILE"
 # Step 1: Parse the PDF and create ebi_holdings.json
 echo ""
 echo "Step 1: Parsing PDF holdings..."
-node scripts/parse_ebi_pdf.js "$PDF_FILE"
+bun scripts/parse-pdf.ts "$PDF_FILE" data/ebi_holdings.json --sqlite data/holdings.db
 
 if [ $? -ne 0 ]; then
     echo "❌ Failed to parse PDF"
@@ -50,4 +50,4 @@ echo "  - Approximation results: data/portfolio_approximation_results.json"
 echo "  - Dashboard: http://localhost:3000"
 echo ""
 echo "🚀 To view results:"
-echo "  pnpm dev" 
+echo "  bun run dev"

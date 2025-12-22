@@ -62,7 +62,7 @@ Based on the latest optimization:
 
 ```bash
 # Run the optimization script directly
-node scripts/approximate_holdings.js
+bun scripts/approximate-holdings.ts
 
 # Or use the convenience script
 ./scripts/update_approximation.sh
@@ -72,10 +72,10 @@ node scripts/approximate_holdings.js
 
 ```bash
 # Install dependencies (if not already done)
-pnpm install
+bun install
 
 # Start the development server
-pnpm dev
+bun run dev
 ```
 
 ### API Usage
@@ -93,12 +93,13 @@ curl http://localhost:3000/api/performance
 
 ## Data Sources
 
-The system uses holdings data from:
+The system uses holdings data from the SQLite DB and also writes JSON exports:
 
-- `data/data-may/ebi_holdings.json` - EBI ETF holdings
-- `data/data-may/vti_holdings.json` - VTI ETF holdings
-- `data/data-may/vtv_holdings.json` - VTV ETF holdings
-- `data/data-may/iwn_holdings.json` - IWN ETF holdings
+- `data/holdings.db` - holdings DB (used by the approximation runner)
+- `data/ebi_holdings.json` - EBI holdings export (from PDF)
+- `data/vti_holdings.json` - VTI holdings export (from API)
+- `data/vtv_holdings.json` - VTV holdings export (from API)
+- `data/iwn_holdings.json` - IWN holdings export (from API)
 
 ## Technical Details
 
@@ -141,11 +142,11 @@ The system uses holdings data from:
 
 2. **"Portfolio approximation results not found"**
 
-   - Run the optimization script first: `node scripts/approximate_holdings.js`
+   - Run the optimization script first: `bun scripts/approximate-holdings.ts`
    - Check that the data files exist in the correct locations
 
 3. **"API request failed"**
-   - Ensure the development server is running: `pnpm dev`
+   - Ensure the development server is running: `bun run dev`
    - Check that the API endpoints are properly configured
 
 ### Performance Optimization

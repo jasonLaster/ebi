@@ -16,8 +16,7 @@ The dashboard provides:
 ### Prerequisites
 
 - Node.js 18+
-- pnpm (recommended) or npm
-- Bun (for scripts/tests)
+- Bun
 - Financial Modeling Prep API key
 
 ### Installation
@@ -27,7 +26,7 @@ The dashboard provides:
    ```bash
    git clone <repository-url>
    cd ebi
-   pnpm install
+   bun install
    ```
 
 2. **Set up environment variables:**
@@ -46,7 +45,7 @@ The dashboard provides:
 4. **Start the development server:**
 
    ```bash
-   pnpm dev
+   bun run dev
    ```
 
 5. **View the dashboard:**
@@ -104,7 +103,7 @@ ebi/
 │   ├── parse-pdf.test.ts        # Tests for PDF parsing
 │   ├── fetch-holdings.ts        # Fetch holdings from FMP API (VTI/VTV/IWN)
 │   ├── fetch-holdings.test.ts   # Tests for fetch holdings + sqlite
-│   ├── approximate_holdings.js  # Main optimization script
+│   ├── approximate-holdings.ts  # Main optimization script (reads from SQLite)
 │   ├── run-approximation.sh     # Convenience script
 │   └── vendor/                  # Third-party libraries
 │       └── Alglib-v1.1.0.js    # Optimization library
@@ -153,7 +152,7 @@ bun run fetch:holdings --all --out-dir data --sqlite data/holdings.db
 ./scripts/run-approximation.sh
 
 # Or run directly
-node scripts/approximate_holdings.js
+bun scripts/approximate-holdings.ts
 ```
 
 ### Testing
@@ -170,13 +169,13 @@ bun test:holdings
 
 ```bash
 # Start development server
-pnpm dev
+bun run dev
 
 # Build for production
-pnpm build
+bun run build
 
 # Start production server
-pnpm start
+bun run start
 ```
 
 ## 📈 API Endpoints
