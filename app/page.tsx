@@ -10,7 +10,6 @@ import {
 import {
   CartesianGrid,
   Legend,
-  Line,
   LineChart,
   ResponsiveContainer,
   Tooltip,
@@ -855,14 +854,6 @@ export default function ETFDashboard() {
                             stroke="#8884d8"
                             fillOpacity={1}
                             fill="url(#colorEBI)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="EBI"
-                            dataKey="EBI_norm"
-                            stroke="#8884d8"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -879,14 +870,6 @@ export default function ETFDashboard() {
                             stroke="#ff7300"
                             fillOpacity={1}
                             fill="url(#colorIWN)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="IWN"
-                            dataKey="IWN_norm"
-                            stroke="#ff7300"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -903,14 +886,6 @@ export default function ETFDashboard() {
                             stroke="#387908"
                             fillOpacity={1}
                             fill="url(#colorVTV)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="VTV"
-                            dataKey="VTV_norm"
-                            stroke="#387908"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -927,14 +902,6 @@ export default function ETFDashboard() {
                             stroke="#82ca9d"
                             fillOpacity={1}
                             fill="url(#colorVTI)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="VTI"
-                            dataKey="VTI_norm"
-                            stroke="#82ca9d"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -951,14 +918,6 @@ export default function ETFDashboard() {
                             stroke="#ffc658"
                             fillOpacity={1}
                             fill="url(#colorIWV)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="IWV (Benchmark)"
-                            dataKey="IWV_norm"
-                            stroke="#ffc658"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -1065,14 +1024,6 @@ export default function ETFDashboard() {
                             stroke="#8884d8"
                             fillOpacity={1}
                             fill="url(#colorEBIDelta)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="EBI vs IWV"
-                            dataKey="EBI_delta_IWV"
-                            stroke="#8884d8"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -1089,14 +1040,6 @@ export default function ETFDashboard() {
                             stroke="#ff7300"
                             fillOpacity={1}
                             fill="url(#colorIWNDelta)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="IWN vs IWV"
-                            dataKey="IWN_delta_IWV"
-                            stroke="#ff7300"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
@@ -1113,14 +1056,6 @@ export default function ETFDashboard() {
                             stroke="#387908"
                             fillOpacity={1}
                             fill="url(#colorVTVDelta)"
-                            strokeWidth={0}
-                            connectNulls={true}
-                          />
-                          <Line
-                            type="monotone"
-                            name="VTV vs IWV"
-                            dataKey="VTV_delta_IWV"
-                            stroke="#387908"
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}

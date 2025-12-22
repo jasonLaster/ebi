@@ -1,6 +1,10 @@
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { HoldingsDb, getHoldingsWeightMap, getAllUniqueSymbols } from "../lib/db";
+import {
+  HoldingsDb,
+  getHoldingsWeightMap,
+  getAllUniqueSymbols,
+} from "../lib/db";
 
 export interface OptimizationMetrics {
   finalObjectiveValue: number;
@@ -53,7 +57,10 @@ async function loadAlglib(): Promise<{ Alglib: AlglibCtor }> {
   (globalThis as unknown as { __filename?: string }).__filename = __filename;
   (globalThis as unknown as { __dirname?: string }).__dirname = __dirname;
 
-  const modUrl = new URL("../../scripts/vendor/Alglib-v1.1.0.js", import.meta.url);
+  const modUrl = new URL(
+    "../../scripts/vendor/Alglib-v1.1.0.js",
+    import.meta.url
+  );
   return (await import(modUrl.href)) as { Alglib: AlglibCtor };
 }
 
@@ -71,7 +78,8 @@ function computeMetrics(
 
   for (let i = 0; i < nStocks; i++) {
     let synthetic = 0;
-    for (let j = 0; j < weights.length; j++) synthetic += H_stack[i][j] * weights[j];
+    for (let j = 0; j < weights.length; j++)
+      synthetic += H_stack[i][j] * weights[j];
     const diff = Math.abs(synthetic - H_target[i]);
     totalError += diff;
     maxError = Math.max(maxError, diff);
@@ -80,7 +88,9 @@ function computeMetrics(
 
   const improvementPercent =
     initialObjectiveValue > 0
-      ? ((initialObjectiveValue - finalObjectiveValue) / initialObjectiveValue) * 100
+      ? ((initialObjectiveValue - finalObjectiveValue) /
+          initialObjectiveValue) *
+        100
       : 0;
 
   return {
@@ -123,7 +133,9 @@ export async function runApproximation(
   }
 
   const targetMap = getHoldingsWeightMap(db, target, { weightField });
-  const baselineMaps = baselines.map((s) => getHoldingsWeightMap(db, s, { weightField }));
+  const baselineMaps = baselines.map((s) =>
+    getHoldingsWeightMap(db, s, { weightField })
+  );
 
   // Use DB tickers as the master universe, but optimization only needs union across these ETFs.
   // Pulling from DB avoids relying on JSON exports and ensures we match what the app uses.
@@ -132,8 +144,12 @@ export async function runApproximation(
 
   // Build vectors/matrix.
   const H_target = symbols.map((sym) => targetMap.get(sym) ?? 0);
-  const H_columns = baselineMaps.map((m) => symbols.map((sym) => m.get(sym) ?? 0));
-  const H_stack: number[][] = symbols.map((_, i) => H_columns.map((col) => col[i]));
+  const H_columns = baselineMaps.map((m) =>
+    symbols.map((sym) => m.get(sym) ?? 0)
+  );
+  const H_stack: number[][] = symbols.map((_, i) =>
+    H_columns.map((col) => col[i])
+  );
 
   const nStocks = symbols.length;
   if (nStocks === 0) throw new Error("No symbols found in DB holdings");
@@ -141,7 +157,8 @@ export async function runApproximation(
   const { Alglib } = await loadAlglib();
   const alglib = new Alglib();
 
-  const initialGuess = opts?.initialGuess ?? defaultInitialGuess(baselines.length);
+  const initialGuess =
+    opts?.initialGuess ?? defaultInitialGuess(baselines.length);
   if (initialGuess.length !== baselines.length) {
     throw new Error(
       `initialGuess length (${initialGuess.length}) must match baselineEtfs length (${baselines.length})`
@@ -152,7 +169,8 @@ export async function runApproximation(
     let sumSquaredDiff = 0;
     for (let i = 0; i < nStocks; i++) {
       let synthetic = 0;
-      for (let j = 0; j < weights.length; j++) synthetic += H_stack[i][j] * weights[j];
+      for (let j = 0; j < weights.length; j++)
+        synthetic += H_stack[i][j] * weights[j];
       const diff = synthetic - H_target[i];
       sumSquaredDiff += diff * diff;
     }
@@ -166,7 +184,9 @@ export async function runApproximation(
     alglib.add_function(objectiveFunction);
 
     // weights must sum to 1
-    alglib.add_equality_constraint((w) => w.reduce((sum, x) => sum + x, 0) - 1.0);
+    alglib.add_equality_constraint(
+      (w) => w.reduce((sum, x) => sum + x, 0) - 1.0
+    );
 
     // 0 <= w_i <= 1
     for (let j = 0; j < baselines.length; j++) {
@@ -186,12 +206,20 @@ export async function runApproximation(
     );
 
     if (!ok) {
-      throw new Error(`Optimization failed. Status: ${JSON.stringify(alglib.get_status())}`);
+      throw new Error(
+        `Optimization failed. Status: ${JSON.stringify(alglib.get_status())}`
+      );
     }
 
     const weights = alglib.get_results();
     const finalObjectiveValue = objectiveFunction(weights);
-    const metrics = computeMetrics(H_target, H_stack, weights, initialObjectiveValue, finalObjectiveValue);
+    const metrics = computeMetrics(
+      H_target,
+      H_stack,
+      weights,
+      initialObjectiveValue,
+      finalObjectiveValue
+    );
 
     const optimalWeights: Record<string, number> = {};
     const weightsPercentages: Record<string, number> = {};
@@ -219,4 +247,3 @@ export async function runApproximation(
     alglib.remove();
   }
 }
-

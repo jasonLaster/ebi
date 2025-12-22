@@ -80,11 +80,11 @@ async function main(): Promise<void> {
     console.log("Optimal weights:");
     for (const sym of results.baselineEtfs) {
       const key = sym.toLowerCase();
-      console.log(`  ${sym}: ${(results.optimalWeights[key] * 100).toFixed(2)}%`);
+      console.log(
+        `  ${sym}: ${(results.optimalWeights[key] * 100).toFixed(2)}%`
+      );
     }
-    console.log(
-      `Total: ${(results.constraints.weightsSum * 100).toFixed(2)}%`
-    );
+    console.log(`Total: ${(results.constraints.weightsSum * 100).toFixed(2)}%`);
     console.log(
       `\nOptimization error (sum of squared differences): ${results.optimizationMetrics.finalObjectiveValue.toFixed(
         6
@@ -105,4 +105,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

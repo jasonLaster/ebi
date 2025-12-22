@@ -64,8 +64,8 @@ Based on the latest optimization:
 # Run the optimization script directly
 bun scripts/approximate-holdings.ts
 
-# Or use the convenience script
-./scripts/update_approximation.sh
+# Or sync inputs first (recommended)
+bun scripts/sync.ts
 ```
 
 ### Starting the Web Dashboard

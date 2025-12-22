@@ -21,25 +21,9 @@ fi
 
 echo "📄 Processing PDF: $PDF_FILE"
 
-# Step 1: Parse the PDF and create ebi_holdings.json
 echo ""
-echo "Step 1: Parsing PDF holdings..."
-bun scripts/parse-pdf.ts "$PDF_FILE" data/ebi_holdings.json --sqlite data/holdings.db
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to parse PDF"
-    exit 1
-fi
-
-# Step 2: Run portfolio approximation
-echo ""
-echo "Step 2: Running portfolio approximation..."
-./scripts/run-approximation.sh
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to run approximation"
-    exit 1
-fi
+echo "Running full sync (parse PDF + fetch holdings + approximate)..."
+bun scripts/sync.ts "$PDF_FILE"
 
 echo ""
 echo "✅ EBI Holdings Processing Complete!"

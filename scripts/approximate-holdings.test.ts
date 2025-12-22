@@ -169,4 +169,3 @@ describe("approximation (SQLite-backed)", () => {
     }
   });
 });
-

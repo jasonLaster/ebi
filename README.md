@@ -39,7 +39,7 @@ The dashboard provides:
 3. **Run portfolio approximation:**
 
    ```bash
-   ./scripts/run-approximation.sh
+   bun scripts/sync.ts
    ```
 
 4. **Start the development server:**
@@ -104,7 +104,7 @@ ebi/
 │   ├── fetch-holdings.ts        # Fetch holdings from FMP API (VTI/VTV/IWN)
 │   ├── fetch-holdings.test.ts   # Tests for fetch holdings + sqlite
 │   ├── approximate-holdings.ts  # Main optimization script (reads from SQLite)
-│   ├── run-approximation.sh     # Convenience script
+│   ├── sync.ts                  # Parse PDF + fetch holdings + approximate
 │   └── vendor/                  # Third-party libraries
 │       └── Alglib-v1.1.0.js    # Optimization library
 └── package.json                 # Dependencies and scripts
@@ -148,8 +148,8 @@ bun run fetch:holdings --all --out-dir data --sqlite data/holdings.db
 ### Portfolio Approximation
 
 ```bash
-# Run the full approximation process
-./scripts/run-approximation.sh
+# Sync holdings + run the approximation (recommended)
+bun scripts/sync.ts
 
 # Or run directly
 bun scripts/approximate-holdings.ts

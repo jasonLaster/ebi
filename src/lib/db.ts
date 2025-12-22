@@ -165,4 +165,3 @@ export function getAllUniqueSymbols(db: HoldingsDb): Set<string> {
   }
   return s;
 }
-
