@@ -25,7 +25,10 @@ async function main(): Promise<void> {
     .description(
       "Sync EBI holdings from PDF + fetch baseline holdings + run approximation"
     )
-    .argument("[pdf]", "Path to EBI holdings PDF (if not provided, downloads latest)")
+    .argument(
+      "[pdf]",
+      "Path to EBI holdings PDF (if not provided, downloads latest)"
+    )
     .option("-o, --out-dir <dir>", "Output directory", "data")
     .option("--target <symbol>", "Target ETF symbol", "EBI")
     .option(
@@ -40,8 +43,14 @@ async function main(): Promise<void> {
     )
     .option("--api-key <key>", "Override FMP_API_KEY env var")
     .option("--no-analyze", "Skip PDF holdings analysis output")
-    .option("--download", "Force download latest PDF (ignores provided PDF path)")
-    .option("--no-download", "Skip download, use existing PDF (requires PDF path)")
+    .option(
+      "--download",
+      "Force download latest PDF (ignores provided PDF path)"
+    )
+    .option(
+      "--no-download",
+      "Skip download, use existing PDF (requires PDF path)"
+    )
     .parse(process.argv);
 
   const opts = program.opts<{
@@ -56,12 +65,12 @@ async function main(): Promise<void> {
   }>();
 
   const [pdfArg] = program.args as [string?];
-  
+
   // Determine if we should download the PDF
   const shouldDownload = opts.download || (!pdfArg && !opts.noDownload);
-  
+
   let pdfPath: string;
-  
+
   if (shouldDownload) {
     // Download the latest PDF
     console.log("📥 Downloading latest PDF from Longview Research Partners...");
@@ -108,7 +117,9 @@ async function main(): Promise<void> {
 
     // Step 2: Fetch baseline ETF holdings -> JSON + Turso
     console.log("");
-    console.log(`Step 2/3: Fetching baseline holdings → ${outDir}/*_holdings.json (+Turso)`);
+    console.log(
+      `Step 2/3: Fetching baseline holdings → ${outDir}/*_holdings.json (+Turso)`
+    );
     const { outputs } = await fetchAndStoreManyEtfHoldings(baselines, {
       outDir,
       db,
@@ -140,4 +151,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

@@ -29,7 +29,7 @@ export interface ApproximationResult {
   };
 }
 
-type AlglibCtor = typeof Alglib;
+// AlglibCtor type removed - not used
 
 function computeMetrics(
   H_target: number[],
@@ -181,7 +181,7 @@ export async function runApproximation(
     if (!weights || weights.length === 0) {
       throw new Error("Optimization returned no results");
     }
-    
+
     const finalObjectiveValue = objectiveFunction(weights);
     const metrics = computeMetrics(
       H_target,

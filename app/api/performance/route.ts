@@ -173,10 +173,12 @@ export async function GET() {
     );
 
     if (historicalDataArray.length > 0) {
-      allHistoricalData[symbol.toLowerCase()] = historicalDataArray.map((d) => ({
-        date: d.date,
-        close: d.close,
-      }));
+      allHistoricalData[symbol.toLowerCase()] = historicalDataArray.map(
+        (d) => ({
+          date: d.date,
+          close: d.close,
+        })
+      );
       const performanceData = calculatePerformance(
         symbol,
         historicalDataArray,
@@ -218,18 +220,16 @@ export async function GET() {
           (symResult.performance - benchmarkResult.performance).toFixed(2)
         );
       } else {
-        comparisonDeltas[
-          deltaKey
-        ] = `N/A (missing performance for ${sym} or ${benchmarkSymbol})`;
+        comparisonDeltas[deltaKey] =
+          `N/A (missing performance for ${sym} or ${benchmarkSymbol})`;
       }
     }
   } else {
     // If benchmark (IWV) data is missing, all deltas against it are N/A
     for (const sym of symbolsForDelta) {
       const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
-      comparisonDeltas[
-        deltaKey
-      ] = `N/A (missing performance for ${benchmarkSymbol})`;
+      comparisonDeltas[deltaKey] =
+        `N/A (missing performance for ${benchmarkSymbol})`;
     }
   }
 

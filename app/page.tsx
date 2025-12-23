@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CartesianGrid,
   Legend,
@@ -115,13 +109,24 @@ const formatDate = (dateString: string) => {
 };
 
 // Custom tooltip formatter for the line chart
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    value?: number | string;
+    color?: string;
+    dataKey?: string;
+  }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (active && payload && payload.length && label) {
     return (
       <div className="bg-white p-4 border rounded-lg shadow-sm">
         <p className="font-medium">{formatDate(label)}</p>
         <div className="mt-2 space-y-1">
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <p key={`item-${index}`} style={{ color: entry.color }}>
               {entry.name}:{" "}
               {typeof entry.value === "number"
@@ -736,7 +741,12 @@ export default function ETFDashboard() {
                 </TabsList>
 
                 <TabsContent value="percentageChange" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={300}
+                  >
                     <LineChart
                       data={combinedData}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -926,7 +936,12 @@ export default function ETFDashboard() {
                 </TabsContent>
 
                 <TabsContent value="percentageDelta" className="h-[500px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={300}
+                  >
                     <LineChart
                       data={combinedData.filter(
                         (d) =>
