@@ -1,14 +1,13 @@
-name: Test Sync Endpoint
+name: Test Sync Endpoint 2
 
 on:
   deployment_status:
 
 jobs:
   test-sync:
-    if: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' }}
+    if: ${{ github.event.deployment_status.state == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10 # Full sync can take time
-    environment: ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,8 +25,7 @@ jobs:
       - name: Test sync endpoint
         id: test_sync
         run: |
-          echo "${{ toJSON(github.event.deployment_status) }}"
-          echo "Testing against Vercel Preview URL: ${{ github.event.deployment_status.target_url }}"
+          echo "Testing against deployment URL: ${{ github.event.deployment_status.target_url }}"
           bun scripts/test-sync.ts "${{ github.event.deployment_status.target_url }}"
 
       - name: Report results

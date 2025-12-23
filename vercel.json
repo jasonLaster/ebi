@@ -1,8 +1,10 @@
 {
+  "bunVersion": "1.x",
   "crons": [
     {
       "path": "/api/sync",
-      "schedule": "0 0 * * *"
+
+      "schedule": "0 5 * * *"
     }
   ]
 }

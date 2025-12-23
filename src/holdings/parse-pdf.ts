@@ -32,6 +32,189 @@ export async function extractTextFromPdf(
   const uint8Array = new Uint8Array(dataBuffer);
 
   logger.log("Parsing PDF content...");
+
+  // Ensure the PDF.js worker message handler is available in Node/serverless.
+  //
+  // In NodeJS, PDF.js uses a "fake worker" that loads `WorkerMessageHandler`
+  // via a dynamic import of `GlobalWorkerOptions.workerSrc`. In Next/Vercel
+  // server builds, the default `./pdf.worker.mjs` path can break after bundling,
+  // yielding:
+  //   Setting up fake worker failed: "Cannot find module './pdf.worker.mjs' ..."
+  //
+  // Preloading the worker module and exposing it on `globalThis.pdfjsWorker`
+  // allows PDF.js to skip the fragile dynamic import and use the handler
+  // directly.
+  type PdfJsWorkerModule = { WorkerMessageHandler?: unknown };
+  const g = globalThis as unknown as { pdfjsWorker?: PdfJsWorkerModule } & Record<
+    string,
+    unknown
+  >;
+
+  if (!g.pdfjsWorker?.WorkerMessageHandler) {
+    try {
+      const workerMod = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+      g.pdfjsWorker = workerMod as unknown as PdfJsWorkerModule;
+    } catch (err) {
+      logger.warn(
+        `Warning: Failed to preload pdfjs worker module: ${String(
+          err instanceof Error ? err.message : err
+        )}`
+      );
+    }
+  }
+
+  // In Node/serverless environments (e.g. Vercel), `pdfjs-dist` may attempt to
+  // polyfill `DOMMatrix`, `ImageData`, and `Path2D` via optional native deps
+  // (notably `@napi-rs/canvas`). If those deps are not installed/available,
+  // `pdfjs-dist` will log warnings and can crash with `ReferenceError: DOMMatrix
+  // is not defined` during module initialization.
+  //
+  // Since we only use text extraction (not rendering), provide lightweight
+  // polyfills to keep `pdfjs-dist` happy without native canvas bindings.
+  type DomMatrixLike = {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
+  };
+
+  function isDomMatrixLike(v: unknown): v is DomMatrixLike {
+    if (!v || typeof v !== "object") return false;
+    const o = v as Record<string, unknown>;
+    return (
+      typeof o.a === "number" &&
+      typeof o.b === "number" &&
+      typeof o.c === "number" &&
+      typeof o.d === "number" &&
+      typeof o.e === "number" &&
+      typeof o.f === "number"
+    );
+  }
+
+  if (!globalThis.DOMMatrix) {
+    class DOMMatrixPolyfill {
+      // Store as 2D matrix [a,b,c,d,e,f]
+      a: number;
+      b: number;
+      c: number;
+      d: number;
+      e: number;
+      f: number;
+
+      constructor(init?: number[] | DomMatrixLike | DOMMatrixPolyfill) {
+        const m = isDomMatrixLike(init) ? init : null;
+        const arr = Array.isArray(init) ? init : null;
+        this.a = arr?.[0] ?? m?.a ?? 1;
+        this.b = arr?.[1] ?? m?.b ?? 0;
+        this.c = arr?.[2] ?? m?.c ?? 0;
+        this.d = arr?.[3] ?? m?.d ?? 1;
+        this.e = arr?.[4] ?? m?.e ?? 0;
+        this.f = arr?.[5] ?? m?.f ?? 0;
+      }
+
+      preMultiplySelf(other: unknown) {
+        // this = other * this
+        const o =
+          other instanceof DOMMatrixPolyfill ? other : new DOMMatrixPolyfill(other as DomMatrixLike);
+        const a = o.a * this.a + o.c * this.b;
+        const b = o.b * this.a + o.d * this.b;
+        const c = o.a * this.c + o.c * this.d;
+        const d = o.b * this.c + o.d * this.d;
+        const e = o.a * this.e + o.c * this.f + o.e;
+        const f = o.b * this.e + o.d * this.f + o.f;
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.d = d;
+        this.e = e;
+        this.f = f;
+        return this;
+      }
+
+      multiplySelf(other: unknown) {
+        // this = this * other
+        const o =
+          other instanceof DOMMatrixPolyfill ? other : new DOMMatrixPolyfill(other as DomMatrixLike);
+        const a = this.a * o.a + this.c * o.b;
+        const b = this.b * o.a + this.d * o.b;
+        const c = this.a * o.c + this.c * o.d;
+        const d = this.b * o.c + this.d * o.d;
+        const e = this.a * o.e + this.c * o.f + this.e;
+        const f = this.b * o.e + this.d * o.f + this.f;
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.d = d;
+        this.e = e;
+        this.f = f;
+        return this;
+      }
+
+      translate(tx = 0, ty = 0) {
+        this.e += tx;
+        this.f += ty;
+        return this;
+      }
+
+      scale(sx = 1, sy = sx) {
+        this.a *= sx;
+        this.b *= sx;
+        this.c *= sy;
+        this.d *= sy;
+        return this;
+      }
+
+      invertSelf() {
+        const det = this.a * this.d - this.b * this.c;
+        if (!det) return this;
+        const a = this.d / det;
+        const b = -this.b / det;
+        const c = -this.c / det;
+        const d = this.a / det;
+        const e = (this.c * this.f - this.d * this.e) / det;
+        const f = (this.b * this.e - this.a * this.f) / det;
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.d = d;
+        this.e = e;
+        this.f = f;
+        return this;
+      }
+    }
+    g.DOMMatrix = DOMMatrixPolyfill as unknown;
+  }
+
+  if (!globalThis.ImageData) {
+    class ImageDataPolyfill {
+      data: Uint8ClampedArray;
+      width: number;
+      height: number;
+      constructor(data: Uint8ClampedArray, width: number, height: number) {
+        this.data = data;
+        this.width = width;
+        this.height = height;
+      }
+    }
+    g.ImageData = ImageDataPolyfill as unknown;
+  }
+
+  if (!globalThis.Path2D) {
+    class Path2DPolyfill {
+      constructor(_path?: unknown) {
+        void _path;
+      }
+      addPath(_path: unknown, _transform?: unknown) {
+        void _path;
+        void _transform;
+      }
+      closePath() {}
+    }
+    g.Path2D = Path2DPolyfill as unknown;
+  }
+
   // Use pdfjs-dist directly and disable workers. This avoids Next/Turbopack
   // trying (and failing) to bundle/resolve `pdf.worker.mjs`.
   //
