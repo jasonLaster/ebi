@@ -8,6 +8,8 @@ import { fetchAndStoreManyEtfHoldings } from "../../../src/holdings/fetch";
 import { openHoldingsDb } from "../../../src/lib/db";
 import { runApproximation } from "../../../src/approximation/optimize";
 
+export const maxDuration = 300; // seconds (Vercel will cap based on your plan)
+
 /**
  * Determines the base directory based on environment.
  * - Serverless (Vercel): Uses /tmp (only writable location)
@@ -16,9 +18,7 @@ import { runApproximation } from "../../../src/approximation/optimize";
 function getBaseDir(): string {
   // Check if running in Vercel serverless environment
   const isServerless = !!process.env.VERCEL || !!process.env.VERCEL_ENV;
-  return isServerless
-    ? "/tmp"
-    : path.resolve(process.cwd(), "data");
+  return isServerless ? "/tmp" : path.resolve(process.cwd(), "data");
 }
 
 function ensureParentDir(filePath: string): void {
@@ -31,13 +31,26 @@ function ensureParentDir(filePath: string): void {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const testMode = url.searchParams.get("test") === "true" || url.searchParams.get("mode") === "test";
-    
+    const testMode =
+      url.searchParams.get("test") === "true" ||
+      url.searchParams.get("mode") === "test";
+
     const baseDir = getBaseDir();
     const target = "EBI";
     const baselines = ["VTI", "VTV", "IWN"];
 
     console.log("🔄 Starting sync process");
+    const g = globalThis as unknown as { Bun?: { version: string } };
+    const isBun = typeof g.Bun !== "undefined";
+    const bunVersion = g.Bun?.version;
+    console.log(
+      `Runtime: ${isBun ? `bun ${bunVersion}` : `node ${process.version}`}`
+    );
+    if (process?.versions) {
+      console.log(
+        `process.versions: node=${process.versions.node ?? "?"}${process.versions.bun ? ` bun=${process.versions.bun}` : ""}`
+      );
+    }
     console.log(`Mode: ${testMode ? "TEST (approximation only)" : "FULL"}`);
     console.log(`Environment: ${process.env.VERCEL ? "serverless" : "local"}`);
     console.log(`Base directory: ${baseDir}`);
@@ -56,7 +69,7 @@ export async function GET(request: Request) {
           .slice(0, -5);
         const pdfFilename = `ebi-holdings-${timestamp}.pdf`;
         const pdfPath = path.join(baseDir, pdfFilename);
-        
+
         const downloadedPdfPath = await downloadHoldingsPdf(pdfPath);
         console.log(`✅ Downloaded: ${downloadedPdfPath}`);
 
@@ -89,7 +102,9 @@ export async function GET(request: Request) {
 
       // Step 4: Run approximation
       console.log("");
-      console.log(`Step ${testMode ? "1" : "4"}/${testMode ? "1" : "4"}: Running portfolio approximation...`);
+      console.log(
+        `Step ${testMode ? "1" : "4"}/${testMode ? "1" : "4"}: Running portfolio approximation...`
+      );
       const results = await runApproximation(db, target, baselines, {
         weightField: "actual_weight",
       });
@@ -97,14 +112,15 @@ export async function GET(request: Request) {
       console.log("");
       console.log(`✅ ${testMode ? "Test" : "Sync"} complete!`);
       console.log(`📊 Optimization metrics:`, {
-        improvementPercent: results.optimizationMetrics.improvementPercent.toFixed(2) + "%",
+        improvementPercent:
+          results.optimizationMetrics.improvementPercent.toFixed(2) + "%",
         averageError: results.optimizationMetrics.averageError.toFixed(6),
         maxError: results.optimizationMetrics.maxError.toFixed(6),
       });
 
       return NextResponse.json({
         success: true,
-        message: testMode 
+        message: testMode
           ? "Test mode: Approximation completed successfully (skipped download/fetch)"
           : "Sync completed successfully",
         testMode,

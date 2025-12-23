@@ -50,6 +50,12 @@ export async function downloadHoldingsPdf(
     // Create a browser session with download support
     const session = await client.sessions.create({
       saveDownloads: true,
+      // PDFs often open in a built-in viewer instead of downloading; force external handling.
+      enableAlwaysOpenPdfExternally: true,
+      // Avoid name collisions across repeated runs.
+      appendTimestampToDownloads: true,
+      // Helpful diagnostics when downloads fail in serverless.
+      enableLogCapture: true,
     });
 
     console.log(`✅ Browser session created: ${session.id}`);
@@ -57,11 +63,16 @@ export async function downloadHoldingsPdf(
     try {
       // Use browser-use agent to navigate and download the PDF
       const result = await client.agents.browserUse.startAndWait({
-        task: `Navigate to https://longviewresearchpartners.com/charts/ and click the "Download PDF" button or link to download the PDF file. The download should start automatically.`,
+        task: `Navigate to https://longviewresearchpartners.com/charts/ and download the PDF via the "Download PDF" button/link.
+
+Important:
+- Ensure the PDF is actually downloaded (not just opened in a tab).
+- Wait briefly after clicking so the download has time to start.`,
         sessionId: session.id,
         llm: "gemini-2.5-flash",
         maxSteps: 30,
-        keepBrowserOpen: false,
+        // Keep the browser open so the download can complete and be captured by the session.
+        keepBrowserOpen: true,
       });
 
       console.log(`✅ Task completed: ${result.status}`);
@@ -81,6 +92,23 @@ export async function downloadHoldingsPdf(
         if (downloadsResponse.status === "completed") {
           break;
         } else if (downloadsResponse.status === "failed") {
+          // Pull session event logs to make debugging easier (e.g. why downloads couldn't be saved).
+          try {
+            const logs = await client.sessions.eventLogs.list(session.id, {
+              limit: 50,
+            });
+            console.log(
+              `🧾 Session event logs (last ${logs.data.length}):`,
+              logs.data.map((l) => ({
+                type: l.type,
+                pageUrl: l.pageUrl,
+                timestamp: l.timestamp,
+                metadata: l.metadata,
+              }))
+            );
+          } catch (logErr) {
+            console.log(`🧾 Failed to fetch session event logs:`, logErr);
+          }
           throw new Error(
             `Download processing failed: ${
               downloadsResponse.error || "Unknown error"
