@@ -60,7 +60,7 @@ async function testSyncEndpoint(
     try {
       body = JSON.parse(responseText) as SyncResponse;
       console.log("Response:", JSON.stringify(body, null, 2));
-    } catch (parseError) {
+    } catch {
       console.error("❌ Failed to parse response as JSON");
       console.error("Response body (first 500 chars):", responseText.substring(0, 500));
       if (httpCode !== 200) {

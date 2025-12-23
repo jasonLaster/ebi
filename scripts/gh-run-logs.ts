@@ -52,9 +52,14 @@ async function getLastRunLogs() {
       // Get the logs for completed runs
       await $`gh run view ${runId} ${logFlag}`.quiet(false);
     }
-  } catch (error: any) {
-    // Check if error is because run is in progress
-    const errorMessage = error?.stderr || error?.message || String(error);
+  } catch (error: unknown) {
+    const errorMessage =
+      typeof (error as { stderr?: unknown } | null)?.stderr === "string"
+        ? ((error as { stderr: string }).stderr ?? "")
+        : error instanceof Error
+          ? error.message
+          : String(error);
+
     if (errorMessage.includes("still in progress") || errorMessage.includes("logs will be available")) {
       console.log("Run is in progress, watching logs...\n");
       try {

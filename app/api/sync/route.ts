@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
+
 import { downloadHoldingsPdf } from "../../../scripts/download-holdings-pdf";
 import { parsePdfToJson } from "../../../src/holdings/parse-pdf";
 import { fetchAndStoreManyEtfHoldings } from "../../../src/holdings/fetch";

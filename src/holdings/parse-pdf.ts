@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import { PDFParse as PdfParse } from "pdf-parse";
 import { Holding, HoldingsData } from "../lib/types";
 import { HoldingsDb, openHoldingsDb } from "../lib/db";
 import { writeHoldingsOutputs, resolvePath } from "./storage";
@@ -33,14 +32,79 @@ export async function extractTextFromPdf(
   const uint8Array = new Uint8Array(dataBuffer);
 
   logger.log("Parsing PDF content...");
-  const parser = new PdfParse(uint8Array);
-  // `load()` is marked private in types, but is required at runtime.
-  await (parser as unknown as { load: () => Promise<void> }).load();
-  const textResult = await parser.getText();
+  // Use pdfjs-dist directly and disable workers. This avoids Next/Turbopack
+  // trying (and failing) to bundle/resolve `pdf.worker.mjs`.
+  //
+  // This is the root cause of:
+  // "Setting up fake worker failed: Cannot find module ... pdf.worker.mjs"
+  type PdfJs = {
+    getDocument: (opts: {
+      data: Uint8Array;
+      disableWorker: boolean;
+      verbosity: number;
+    }) => { promise: Promise<PdfDocument> };
+  };
+  type PdfDocument = {
+    numPages: number;
+    getPage: (n: number) => Promise<PdfPage>;
+  };
+  type PdfPage = {
+    getTextContent: () => Promise<{
+      items: Array<{
+        str?: string;
+        transform?: number[]; // [a,b,c,d,e,f] where e=x, f=y
+      }>;
+    }>;
+  };
 
-  return typeof textResult === "string"
-    ? textResult
-    : textResult.text || String(textResult);
+  const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfJs;
+  const getDocument = pdfjs.getDocument;
+
+  const doc = await getDocument({
+    data: uint8Array,
+    disableWorker: true,
+    verbosity: 0,
+  }).promise;
+
+  const pages: string[] = [];
+  for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+    const page = await doc.getPage(pageNum);
+    const content = await page.getTextContent();
+    const items = Array.isArray(content.items) ? content.items : [];
+
+    // Reconstruct lines by grouping text items by their Y coordinate, then
+    // ordering items by X coordinate within each line.
+    //
+    // This preserves line breaks, which our holdings parser relies on.
+    const linesByY = new Map<number, Array<{ x: number; str: string }>>();
+
+    for (const it of items) {
+      const str = typeof it.str === "string" ? it.str.trim() : "";
+      if (!str) continue;
+
+      const t = Array.isArray(it.transform) ? it.transform : null;
+      const x = typeof t?.[4] === "number" ? t[4] : 0;
+      const y = typeof t?.[5] === "number" ? t[5] : 0;
+
+      // Bucket Y to reduce fragmentation (PDFs often vary slightly per glyph).
+      const yKey = Math.round(y * 2) / 2; // 0.5pt buckets
+      const arr = linesByY.get(yKey) ?? [];
+      arr.push({ x, str });
+      linesByY.set(yKey, arr);
+    }
+
+    const sortedY = Array.from(linesByY.keys()).sort((a, b) => b - a);
+    const lines: string[] = [];
+    for (const y of sortedY) {
+      const parts = (linesByY.get(y) ?? []).sort((a, b) => a.x - b.x);
+      const line = parts.map((p) => p.str).join(" ").replace(/\s+/g, " ").trim();
+      if (line) lines.push(line);
+    }
+
+    pages.push(lines.join("\n"));
+  }
+
+  return pages.join("\n");
 }
 
 export function parseHoldingsFromText(
