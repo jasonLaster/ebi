@@ -5,8 +5,8 @@ import * as path from "path";
 import {
   fetchEtfHoldings,
   fetchAndStoreManyEtfHoldings,
-} from "../src/holdings/fetch";
-import { openHoldingsDb } from "../src/lib/db";
+} from "@/src/holdings/fetch";
+import { openHoldingsDb } from "@/src/lib/db";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "ebi-holdings-"));

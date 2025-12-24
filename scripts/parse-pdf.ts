@@ -9,8 +9,8 @@ import {
   parseHoldingsFromText,
   extractTextFromPdf,
   analyzeHoldings,
-} from "../src/holdings/parse-pdf";
-import { openHoldingsDb } from "../src/lib/db";
+} from "@/src/holdings/parse-pdf";
+import { openHoldingsDb } from "@/src/lib/db";
 
 export {
   parsePdfToJson,
@@ -19,7 +19,7 @@ export {
   extractTextFromPdf,
   analyzeHoldings,
 };
-export type { Holding, HoldingsData } from "../src/lib/types";
+export type { Holding, HoldingsData } from "@/src/lib/types";
 
 async function main(): Promise<void> {
   const program = new Command();

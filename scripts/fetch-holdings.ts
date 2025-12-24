@@ -4,8 +4,8 @@ import { Command } from "commander";
 import {
   BASELINE_ETFS,
   fetchAndStoreManyEtfHoldings,
-} from "../src/holdings/fetch";
-import { openHoldingsDb } from "../src/lib/db";
+} from "@/src/holdings/fetch";
+import { openHoldingsDb } from "@/src/lib/db";
 
 async function main(): Promise<void> {
   const program = new Command();

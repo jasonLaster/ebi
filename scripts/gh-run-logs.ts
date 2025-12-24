@@ -32,7 +32,8 @@ async function getLastRunLogs() {
     }
 
     // Check if the run is in progress
-    const runStatus = await $`gh run view ${runId} --json status --jq '.status'`.text();
+    const runStatus =
+      await $`gh run view ${runId} --json status --jq '.status'`.text();
     const status = runStatus.trim();
 
     console.log(`Fetching logs for run: ${runId}`);
@@ -47,7 +48,9 @@ async function getLastRunLogs() {
     if (status === "in_progress" || status === "queued") {
       console.log("Run is in progress, watching logs...\n");
       // Use watch to stream logs in real-time
-      await $`gh run watch ${runId} ${showAll ? "" : "--log-failed"}`.quiet(false);
+      await $`gh run watch ${runId} ${showAll ? "" : "--log-failed"}`.quiet(
+        false
+      );
     } else {
       // Get the logs for completed runs
       await $`gh run view ${runId} ${logFlag}`.quiet(false);
@@ -60,7 +63,10 @@ async function getLastRunLogs() {
           ? error.message
           : String(error);
 
-    if (errorMessage.includes("still in progress") || errorMessage.includes("logs will be available")) {
+    if (
+      errorMessage.includes("still in progress") ||
+      errorMessage.includes("logs will be available")
+    ) {
       console.log("Run is in progress, watching logs...\n");
       try {
         // Get run ID from error context or re-fetch
@@ -68,7 +74,9 @@ async function getLastRunLogs() {
           await $`gh run list --limit 1 --json databaseId --jq '.[0].databaseId'`.text();
         const runId = lastRunId.trim();
         const showAll = options.all;
-        await $`gh run watch ${runId} ${showAll ? "" : "--log-failed"}`.quiet(false);
+        await $`gh run watch ${runId} ${showAll ? "" : "--log-failed"}`.quiet(
+          false
+        );
       } catch (watchError) {
         console.error("Error watching logs:", watchError);
         process.exit(1);

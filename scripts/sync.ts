@@ -2,10 +2,10 @@ import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
 import { Command } from "commander";
-import { parsePdfToJson } from "../src/holdings/parse-pdf";
-import { fetchAndStoreManyEtfHoldings } from "../src/holdings/fetch";
-import { openHoldingsDb } from "../src/lib/db";
-import { runApproximation } from "../src/approximation/optimize";
+import { parsePdfToJson } from "@/src/holdings/parse-pdf";
+import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
+import { openHoldingsDb } from "@/src/lib/db";
+import { runApproximation } from "@/src/approximation/optimize";
 import { downloadHoldingsPdf } from "./download-holdings-pdf";
 
 function resolvePath(p: string): string {

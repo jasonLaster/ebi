@@ -2,8 +2,8 @@ import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
 import { Command } from "commander";
-import { openHoldingsDb } from "../src/lib/db";
-import { runApproximation } from "../src/approximation/optimize";
+import { openHoldingsDb } from "@/src/lib/db";
+import { runApproximation } from "@/src/approximation/optimize";
 
 function resolvePath(p: string): string {
   return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);

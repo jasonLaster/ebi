@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
+import { openHoldingsDb, getPerformanceCache, setPerformanceCache } from "@/src/lib/db";
 
 // Debug: API route loaded
 console.log("[EBI API] route.ts loaded");
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
-
-export const runtime = "nodejs";
 
 interface HistoricalPriceData {
   date: string;
@@ -160,6 +159,27 @@ export async function GET() {
   const startDateStr = "2025-03-01";
   const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
 
+  // Generate cache key based on start date and symbols
+  const cacheKey = `performance_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
+
+  // Try to get from cache
+  const db = await openHoldingsDb();
+  try {
+    const cached = await getPerformanceCache(db, cacheKey);
+    if (cached) {
+      console.log("[EBI API] Returning cached result");
+      const cachedData = JSON.parse(cached);
+      // Update the endDate in the cached response to reflect current date
+      cachedData.dateRange.endDate = endDateStr;
+      db.close();
+      return NextResponse.json(cachedData);
+    }
+  } catch (error) {
+    console.warn("[EBI API] Error reading cache, proceeding with fresh fetch:", error);
+  }
+
+  // Cache miss or error - fetch fresh data
+  console.log("[EBI API] Cache miss, fetching fresh data from API");
   const results: PerformanceResult[] = [];
   const allHistoricalData: {
     [symbol: string]: { date: string; close: number }[] | { error: string };
@@ -290,6 +310,17 @@ export async function GET() {
     deltaNote:
       "Positive delta means the first symbol performed better than the second by that percentage point difference.",
   };
+
+  // Store in cache
+  try {
+    await setPerformanceCache(db, cacheKey, endDateStr, JSON.stringify(finalJsonOutput));
+    console.log("[EBI API] Result cached successfully");
+  } catch (error) {
+    console.warn("[EBI API] Error caching result:", error);
+    // Continue even if caching fails
+  } finally {
+    db.close();
+  }
 
   console.log("[EBI API] Returning JSON result");
   return NextResponse.json(finalJsonOutput);

@@ -65,7 +65,9 @@ async function main() {
       try {
         const { res, json } = await fetchJson(testUrl);
         const obj =
-          json && typeof json === "object" ? (json as Record<string, unknown>) : null;
+          json && typeof json === "object"
+            ? (json as Record<string, unknown>)
+            : null;
 
         if (res.ok && obj?.success === true) {
           console.log("\n✅ PDF parse smoke test passed");
@@ -100,4 +102,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

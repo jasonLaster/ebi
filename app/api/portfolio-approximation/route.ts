@@ -1,39 +1,32 @@
 import { NextResponse } from "next/server";
-import * as fs from "fs";
-import * as path from "path";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { openHoldingsDb } from "@/src/lib/db";
+import { runApproximation } from "@/src/approximation/optimize";
 
-export async function GET() {
+export const maxDuration = 300; // seconds (Vercel will cap based on your plan)
+
+async function getApproximationResults() {
+  const target = "EBI";
+  const baselines = ["VTI", "VTV", "IWN"];
+
+  console.log(
+    `Running portfolio approximation for ${target} using ${baselines.join(", ")}`
+  );
+
+  const db = await openHoldingsDb();
   try {
-    const resultsPath = path.join(
-      process.cwd(),
-      "data/portfolio_approximation_results.json"
-    );
-
-    if (!fs.existsSync(resultsPath)) {
-      return NextResponse.json(
-        {
-          error:
-            "Portfolio approximation results not found. Run the approximation script first.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const fileContent = await fs.promises.readFile(resultsPath, "utf8");
-    const results = JSON.parse(fileContent);
+    const results = await runApproximation(db, target, baselines, {
+      weightField: "actual_weight",
+    });
 
     // Add additional analysis
     const enhancedResults = {
       ...results,
       analysis: {
-        ...results.optimizationMetrics,
         // Calculate tracking error
         trackingError: Math.sqrt(
           results.optimizationMetrics.finalObjectiveValue
         ),
-        // Calculate information ratio (if we had benchmark returns)
+        // Calculate error rate
         errorRate:
           (results.optimizationMetrics.errorCount /
             results.optimizationMetrics.totalStocks) *
@@ -48,11 +41,22 @@ export async function GET() {
       },
     };
 
-    return NextResponse.json(enhancedResults);
+    return enhancedResults;
+  } finally {
+    db.close();
+  }
+}
+
+export async function GET() {
+  try {
+    const results = await getApproximationResults();
+    return NextResponse.json(results);
   } catch (error) {
-    console.error("Error reading portfolio approximation results:", error);
+    console.error("Error running portfolio approximation:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     return NextResponse.json(
-      { error: "Failed to load portfolio approximation results" },
+      { error: "Failed to run portfolio approximation", details: errorMessage },
       { status: 500 }
     );
   }
@@ -60,26 +64,15 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Trigger a new optimization run
-    const execFileAsync = promisify(execFile);
-
-    console.log("Running portfolio approximation optimization...");
-    const { stdout, stderr } = await execFileAsync("bun", [
-      path.join(process.cwd(), "scripts/approximate-holdings.ts"),
-    ]);
-
-    if (stderr) {
-      console.error("Optimization stderr:", stderr);
-    }
-
-    console.log("Optimization stdout:", stdout);
-
-    // Return the updated results
-    return await GET();
+    // POST does the same thing as GET - runs approximation and returns results
+    const results = await getApproximationResults();
+    return NextResponse.json(results);
   } catch (error) {
     console.error("Error running portfolio approximation:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     return NextResponse.json(
-      { error: "Failed to run portfolio approximation" },
+      { error: "Failed to run portfolio approximation", details: errorMessage },
       { status: 500 }
     );
   }
