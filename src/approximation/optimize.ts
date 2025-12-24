@@ -104,16 +104,63 @@ export async function runApproximation(
     baselines.map((s) => getHoldingsWeightMap(db, s, { weightField }))
   );
 
-  // Use DB tickers as the master universe, but optimization only needs union across these ETFs.
-  // Pulling from DB avoids relying on JSON exports and ensures we match what the app uses.
-  const allSymbols = await getAllUniqueSymbols(db);
-  const symbols = Array.from(allSymbols).sort();
+  // Use union of symbols from target + baseline ETFs only (not all DB symbols)
+  // This reduces problem size and avoids irrelevant symbols from other ETFs
+  const relevantSymbols = new Set<string>();
+  for (const sym of targetMap.keys()) relevantSymbols.add(sym);
+  for (const map of baselineMaps) {
+    for (const sym of map.keys()) relevantSymbols.add(sym);
+  }
+  let symbols = Array.from(relevantSymbols).sort();
+
+  // Filter out test symbols (AAA, BBB) as a safety measure
+  const TEST_SYMBOLS = new Set(["AAA", "BBB"]);
+  const symbolsBeforeFilter = symbols.length;
+  symbols = symbols.filter((sym) => !TEST_SYMBOLS.has(sym.toUpperCase()));
+  
+  // Warn if test symbols were found and filtered
+  const filteredCount = symbolsBeforeFilter - symbols.length;
+  if (filteredCount > 0) {
+    console.warn(
+      `⚠️  Warning: Filtered out ${filteredCount} test symbol(s) (AAA, BBB) from optimization`
+    );
+  }
 
   // Build vectors/matrix.
-  const H_target = symbols.map((sym) => targetMap.get(sym) ?? 0);
-  const H_columns = baselineMaps.map((m) =>
+  const H_target_raw = symbols.map((sym) => targetMap.get(sym) ?? 0);
+  const H_columns_raw = baselineMaps.map((m) =>
     symbols.map((sym) => m.get(sym) ?? 0)
   );
+
+  // Normalize weights: each ETF's weights should sum to 1 for proper portfolio approximation
+  // Compute sum of weights for target and each baseline
+  const targetSum = H_target_raw.reduce((sum, w) => sum + w, 0);
+  const baselineSums = H_columns_raw.map((col) =>
+    col.reduce((sum, w) => sum + w, 0)
+  );
+
+  // Warn if weights don't sum to ~1 (within 5% tolerance)
+  if (Math.abs(targetSum - 1.0) > 0.05) {
+    console.warn(
+      `⚠️  Warning: Target ETF (${target}) weights sum to ${(targetSum * 100).toFixed(2)}% (expected ~100%). Results may be inaccurate.`
+    );
+  }
+  for (let i = 0; i < baselines.length; i++) {
+    if (Math.abs(baselineSums[i] - 1.0) > 0.05) {
+      console.warn(
+        `⚠️  Warning: Baseline ETF (${baselines[i]}) weights sum to ${(baselineSums[i] * 100).toFixed(2)}% (expected ~100%). Results may be inaccurate.`
+      );
+    }
+  }
+
+  // Normalize: divide each vector by its sum (unless sum is zero or very small)
+  const H_target = H_target_raw.map(
+    (w) => (targetSum > 1e-10 ? w / targetSum : 0)
+  );
+  const H_columns = H_columns_raw.map((col, idx) =>
+    col.map((w) => (baselineSums[idx] > 1e-10 ? w / baselineSums[idx] : 0))
+  );
+
   const H_stack: number[][] = symbols.map((_, i) =>
     H_columns.map((col) => col[i])
   );
