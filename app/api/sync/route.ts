@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import * as fs from "fs";
 import * as path from "path";
 
-import { downloadHoldingsPdf } from "../../../scripts/download-holdings-pdf";
-import { parsePdfToJson } from "../../../src/holdings/parse-pdf";
-import { fetchAndStoreManyEtfHoldings } from "../../../src/holdings/fetch";
-import { openHoldingsDb } from "../../../src/lib/db";
-import { runApproximation } from "../../../src/approximation/optimize";
+import { downloadHoldingsPdf } from "@/scripts/download-holdings-pdf";
+import { parsePdfToJson } from "@/src/holdings/parse-pdf";
+import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
+import { openHoldingsDb } from "@/src/lib/db";
+import { runApproximation } from "@/src/approximation/optimize";
 
 export const maxDuration = 300; // seconds (Vercel will cap based on your plan)
 

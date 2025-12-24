@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
-import { HoldingsData } from "../lib/types";
-import { storeHoldingsData, HoldingsDb } from "../lib/db";
+import { HoldingsData } from "@/src/lib/types";
+import { storeHoldingsData, HoldingsDb } from "@/src/lib/db";
 
 export function ensureParentDir(filePath: string): void {
   const dir = path.dirname(filePath);

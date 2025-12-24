@@ -1,6 +1,6 @@
 import * as fs from "fs";
-import { Holding, HoldingsData } from "../lib/types";
-import { HoldingsDb, openHoldingsDb } from "../lib/db";
+import { Holding, HoldingsData } from "@/src/lib/types";
+import { HoldingsDb, openHoldingsDb } from "@/src/lib/db";
 import { writeHoldingsOutputs, resolvePath } from "./storage";
 
 export type Logger = Pick<typeof console, "log" | "warn" | "error">;

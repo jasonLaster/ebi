@@ -2,7 +2,7 @@ import {
   HoldingsDb,
   getHoldingsWeightMap,
   getAllUniqueSymbols,
-} from "../lib/db";
+} from "@/src/lib/db";
 import { Alglib } from "./alglib.js";
 
 export interface OptimizationMetrics {

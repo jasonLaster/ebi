@@ -188,3 +188,66 @@ export async function getAllUniqueSymbols(db: HoldingsDb): Promise<Set<string>> 
   }
   return s;
 }
+
+/**
+ * Get cached performance data if it's less than 24 hours old
+ * @returns The cached payload if valid, null otherwise
+ */
+export async function getPerformanceCache(
+  db: HoldingsDb,
+  cacheKey: string
+): Promise<string | null> {
+  const result = await db.execute({
+    sql: `
+      SELECT created_at, payload_json, asof_date
+      FROM performance_cache
+      WHERE cache_key = ?
+    `,
+    args: [cacheKey],
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  const createdAt = new Date(row.created_at as string);
+  const now = new Date();
+  const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+
+  // Cache is valid for 24 hours
+  if (hoursSinceCreation < 24) {
+    return row.payload_json as string;
+  }
+
+  // Cache expired, delete it
+  await db.execute({
+    sql: `DELETE FROM performance_cache WHERE cache_key = ?`,
+    args: [cacheKey],
+  });
+
+  return null;
+}
+
+/**
+ * Store performance data in cache
+ */
+export async function setPerformanceCache(
+  db: HoldingsDb,
+  cacheKey: string,
+  asofDate: string,
+  payloadJson: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `
+      INSERT INTO performance_cache (cache_key, asof_date, created_at, payload_json)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(cache_key) DO UPDATE SET
+        asof_date = excluded.asof_date,
+        created_at = excluded.created_at,
+        payload_json = excluded.payload_json
+    `,
+    args: [cacheKey, asofDate, now, payloadJson],
+  });
+}

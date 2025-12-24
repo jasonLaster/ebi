@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { openHoldingsDb, storeHoldingsData } from "../src/lib/db";
-import type { HoldingsData } from "../src/lib/types";
-import { runApproximation } from "../src/approximation/optimize";
+import { openHoldingsDb, storeHoldingsData } from "@/src/lib/db";
+import type { HoldingsData } from "@/src/lib/types";
+import { runApproximation } from "@/src/approximation/optimize";
 
 async function writeEtf(
   db: Awaited<ReturnType<typeof openHoldingsDb>>,

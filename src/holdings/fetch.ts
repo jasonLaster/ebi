@@ -2,9 +2,9 @@ import {
   fetchEtfHoldingsFromFmp,
   normalizeFmpHoldingsToMap,
   FetchLike,
-} from "../lib/fmp-api";
-import { HoldingsData } from "../lib/types";
-import { openHoldingsDb, HoldingsDb } from "../lib/db";
+} from "@/src/lib/fmp-api";
+import { HoldingsData } from "@/src/lib/types";
+import { openHoldingsDb, HoldingsDb } from "@/src/lib/db";
 import { writeHoldingsOutputs } from "./storage";
 import * as path from "path";
 
