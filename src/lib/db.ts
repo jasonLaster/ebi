@@ -65,6 +65,23 @@ export async function ensureSchema(db: HoldingsDb): Promise<void> {
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)
   `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      raw TEXT,
+      data TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_type_status ON tasks(type, status)
+  `);
 }
 
 export async function upsertEtf(
