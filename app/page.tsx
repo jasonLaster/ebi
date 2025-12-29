@@ -23,6 +23,7 @@ import { ReferenceLine } from "recharts";
 import React, { useEffect, useState, useMemo } from "react";
 import { PortfolioApproximation } from "@/components/portfolio-approximation";
 import { PortfolioComparison } from "@/components/portfolio-comparison";
+import { Button } from "@/components/ui/button";
 
 // Define interfaces for the API response
 interface PerformanceEntry {
@@ -525,6 +526,12 @@ export default function ETFDashboard() {
               >
                 Delta vs IWV
               </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -585,6 +592,17 @@ export default function ETFDashboard() {
                   ) : (
                     <span className="text-gray-400">N/A</span>
                   )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadHoldings(item.symbol)}
+                    className="flex items-center gap-1"
+                  >
+                    <DownloadIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Download</span>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -689,6 +707,17 @@ export default function ETFDashboard() {
                   ) : (
                     <span className="text-gray-400">N/A</span>
                   )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadHoldings(item.symbol)}
+                    className="flex items-center gap-1"
+                  >
+                    <DownloadIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Download</span>
+                  </Button>
                 </td>
               </tr>
             ))}

@@ -3,4 +3,3 @@ declare module "pdfjs-dist/legacy/build/pdf.worker.mjs" {
   // We don't need full typings here; we just need `WorkerMessageHandler`.
   export const WorkerMessageHandler: unknown;
 }
-
