@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { openHoldingsDb, getPerformanceCache, setPerformanceCache } from "@/src/lib/db";
+import {
+  openHoldingsDb,
+  getPerformanceCache,
+  setPerformanceCache,
+  getEtfPeRatio,
+  updateEtfPeRatio,
+  updateHoldingsPeRatios,
+} from "@/src/lib/db";
+import { calculateEtfWeightedPeRatio } from "@/src/lib/fmp-api";
 
 // Debug: API route loaded
 console.log("[EBI API] route.ts loaded");
@@ -160,7 +168,8 @@ export async function GET() {
   const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
 
   // Generate cache key based on start date and symbols
-  const cacheKey = `performance_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
+  // Include version "v3" to invalidate old cache that didn't have weighted peRatio
+  const cacheKey = `performance_v3_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
 
   // Try to get from cache
   const db = await openHoldingsDb();
@@ -184,6 +193,50 @@ export async function GET() {
   const allHistoricalData: {
     [symbol: string]: { date: string; close: number }[] | { error: string };
   } = {};
+  const peRatios: Record<string, number | null> = {};
+
+  // Fetch weighted P/E ratios for all ETFs
+  // First check database cache, then calculate from FMP API if needed
+  console.log("[EBI API] Fetching weighted P/E ratios for ETFs...");
+  const peRatioPromises = symbolsToCompare.map(async (symbol) => {
+    const lowerSymbol = symbol.toLowerCase();
+    
+    // Check database cache first (24 hour TTL)
+    try {
+      const cached = await getEtfPeRatio(db, symbol, 24);
+      if (cached !== null) {
+        console.log(`[EBI API] Using cached P/E for ${symbol}: ${cached.peRatio}`);
+        return { symbol: lowerSymbol, peRatio: cached.peRatio };
+      }
+    } catch (error) {
+      console.warn(`[EBI API] Error checking P/E cache for ${symbol}:`, error);
+    }
+    
+    // Cache miss - calculate from FMP API (fetch ALL holdings)
+    console.log(`[EBI API] Calculating P/E for ${symbol} from FMP API (all holdings)...`);
+    const result = await calculateEtfWeightedPeRatio(symbol); // No topN = all holdings
+    
+    // Store in database
+    try {
+      await updateEtfPeRatio(db, symbol, result.weightedPe);
+      
+      // Also store individual holding P/E ratios if we have them
+      if (Object.keys(result.holdingPeRatios).length > 0) {
+        await updateHoldingsPeRatios(db, symbol, result.holdingPeRatios);
+      }
+      console.log(`[EBI API] Stored P/E for ${symbol} in database`);
+    } catch (error) {
+      console.warn(`[EBI API] Error storing P/E for ${symbol}:`, error);
+    }
+    
+    return { symbol: lowerSymbol, peRatio: result.weightedPe };
+  });
+
+  const peRatioResults = await Promise.all(peRatioPromises);
+  for (const { symbol, peRatio } of peRatioResults) {
+    peRatios[symbol] = peRatio;
+  }
+  console.log("[EBI API] P/E ratios fetched:", peRatios);
 
   for (const symbol of symbolsToCompare) {
     const historicalDataArray = await getHistoricalData(

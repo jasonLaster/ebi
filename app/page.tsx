@@ -11,7 +11,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowDownIcon, ArrowUpIcon, InfoIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  DownloadIcon,
+  InfoIcon,
+  MoreHorizontalIcon,
+} from "lucide-react";
 import {
   Tooltip as UITooltip,
   TooltipContent,
@@ -23,6 +29,14 @@ import { ReferenceLine } from "recharts";
 import React, { useEffect, useState, useMemo } from "react";
 import { PortfolioApproximation } from "@/components/portfolio-approximation";
 import { PortfolioComparison } from "@/components/portfolio-comparison";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { downloadHoldings } from "@/app/lib/actions";
 
 // Define interfaces for the API response
 interface PerformanceEntry {
@@ -148,6 +162,14 @@ export default function ETFDashboard() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDownloadHoldings = async (symbol: string) => {
+    try {
+      await downloadHoldings(symbol);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `Failed to download holdings for ${symbol}`);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/performance")
@@ -586,6 +608,35 @@ export default function ETFDashboard() {
                     <span className="text-gray-400">N/A</span>
                   )}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sm:px-6">
+                  {item.perfData &&
+                  item.perfData.peRatio !== null &&
+                  item.perfData.peRatio !== undefined ? (
+                    <span className="font-medium">
+                      {item.perfData.peRatio.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontalIcon className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleDownloadHoldings(item.symbol)}
+                      >
+                        <DownloadIcon className="h-4 w-4 mr-2" />
+                        Download holdings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
               </tr>
             ))}
 
@@ -689,6 +740,35 @@ export default function ETFDashboard() {
                   ) : (
                     <span className="text-gray-400">N/A</span>
                   )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sm:px-6">
+                  {item.perfData &&
+                  item.perfData.peRatio !== null &&
+                  item.perfData.peRatio !== undefined ? (
+                    <span className="font-medium">
+                      {item.perfData.peRatio.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontalIcon className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleDownloadHoldings(item.symbol)}
+                      >
+                        <DownloadIcon className="h-4 w-4 mr-2" />
+                        Download holdings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
             ))}
