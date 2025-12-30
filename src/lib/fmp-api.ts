@@ -110,3 +110,46 @@ export function normalizeFmpHoldingsToMap(
 
   return holdings;
 }
+
+export interface FmpKeyMetrics {
+  symbol?: string;
+  peRatio?: number | null;
+  priceEarningsRatio?: number | null;
+}
+
+/**
+ * Fetch key metrics (including P/E ratio) for a symbol from FMP API
+ */
+export async function fetchKeyMetricsFromFmp(
+  symbol: string,
+  opts?: { apiKey?: string; fetchImpl?: FetchLike }
+): Promise<FmpKeyMetrics | null> {
+  const apiKey = opts?.apiKey ?? getFmpApiKey();
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const upperSymbol = symbol.toUpperCase();
+
+  const url = `${BASE_URL}/key-metrics/${upperSymbol}?apikey=${apiKey}&limit=1`;
+  try {
+    const res = await fetchImpl(url);
+    if (!res.ok) {
+      console.warn(
+        `Failed to fetch key metrics for ${upperSymbol}: ${res.status} ${res.statusText}`
+      );
+      return null;
+    }
+
+    const json = await res.json();
+    if (!Array.isArray(json) || json.length === 0) {
+      return null;
+    }
+
+    const metrics = json[0] as FmpKeyMetrics;
+    return metrics;
+  } catch (error) {
+    console.warn(
+      `Exception fetching key metrics for ${upperSymbol}:`,
+      error
+    );
+    return null;
+  }
+}

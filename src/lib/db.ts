@@ -65,6 +65,23 @@ export async function ensureSchema(db: HoldingsDb): Promise<void> {
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)
   `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      raw TEXT,
+      data TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_type_status ON tasks(type, status)
+  `);
 }
 
 export async function upsertEtf(
@@ -187,6 +204,59 @@ export async function getAllUniqueSymbols(db: HoldingsDb): Promise<Set<string>> 
     if (ticker) s.add(ticker);
   }
   return s;
+}
+
+export async function getHoldingsForEtf(
+  db: HoldingsDb,
+  etfSymbol: string
+): Promise<HoldingsData | null> {
+  const symbol = etfSymbol.toUpperCase();
+  
+  // First get the ETF info
+  const etfResult = await db.execute({
+    sql: `SELECT id, symbol, last_updated FROM etfs WHERE symbol = ?`,
+    args: [symbol],
+  });
+
+  if (etfResult.rows.length === 0) {
+    return null;
+  }
+
+  const etfRow = etfResult.rows[0];
+  const etfId = etfRow.id as number;
+  const lastUpdated = etfRow.last_updated as string;
+
+  // Get all holdings for this ETF
+  const holdingsResult = await db.execute({
+    sql: `
+      SELECT ticker, name, weight, market_value, actual_weight, price, shares
+      FROM holdings
+      WHERE etf_id = ?
+      ORDER BY actual_weight DESC, ticker ASC
+    `,
+    args: [etfId],
+  });
+
+  const holdings: Record<string, Holding> = {};
+  for (const row of holdingsResult.rows) {
+    const ticker = (row.ticker ?? "").toString().trim();
+    if (!ticker) continue;
+
+    holdings[ticker] = {
+      name: (row.name ?? "").toString(),
+      weight: typeof row.weight === "number" ? row.weight : Number(row.weight) || 0,
+      market_value: typeof row.market_value === "number" ? row.market_value : Number(row.market_value) || 0,
+      actual_weight: typeof row.actual_weight === "number" ? row.actual_weight : Number(row.actual_weight) || 0,
+      price: typeof row.price === "number" ? row.price : row.price ? Number(row.price) : null,
+      shares: typeof row.shares === "number" ? row.shares : Number(row.shares) || 0,
+    };
+  }
+
+  return {
+    etfSymbol: symbol,
+    lastUpdated,
+    holdings,
+  };
 }
 
 /**

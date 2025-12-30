@@ -1,10 +1,4 @@
 import { NextResponse } from "next/server";
-import {
-  openHoldingsDb,
-  getPerformanceCache,
-  setPerformanceCache,
-} from "@/src/lib/db";
-import { fetchKeyMetricsFromFmp } from "@/src/lib/fmp-api";
 
 // Debug: API route loaded
 console.log("[EBI API] route.ts loaded");
@@ -39,10 +33,6 @@ interface PerformanceResult {
 
 const API_BASE_URL =
   "https://financialmodelingprep.com/api/v3/historical-price-full";
-
-function isoDateUTC(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 async function getHistoricalData(
   symbol: string,
@@ -162,51 +152,12 @@ export async function GET() {
 
   const symbolsToCompare = ["EBI", "VTI", "IWV", "IWN", "VTV"];
   const startDateStr = "2025-03-01";
-  const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
+  const endDateStr = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
 
-  // Generate cache key based on start date and symbols
-  // Include version "v2" to invalidate old cache that didn't have peRatio
-  const cacheKey = `performance_v2_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
-
-  // Try to get from cache
-  const db = await openHoldingsDb();
-  try {
-    const cached = await getPerformanceCache(db, cacheKey);
-    if (cached) {
-      console.log("[EBI API] Returning cached result");
-      const cachedData = JSON.parse(cached);
-      // Update the endDate in the cached response to reflect current date
-      cachedData.dateRange.endDate = endDateStr;
-      db.close();
-      return NextResponse.json(cachedData);
-    }
-  } catch (error) {
-    console.warn(
-      "[EBI API] Error reading cache, proceeding with fresh fetch:",
-      error
-    );
-  }
-
-  // Cache miss or error - fetch fresh data
-  console.log("[EBI API] Cache miss, fetching fresh data from API");
   const results: PerformanceResult[] = [];
   const allHistoricalData: {
     [symbol: string]: { date: string; close: number }[] | { error: string };
   } = {};
-  const peRatios: Record<string, number | null> = {};
-
-  // Fetch P/E ratios for all symbols in parallel
-  const peRatioPromises = symbolsToCompare.map(async (symbol) => {
-    const metrics = await fetchKeyMetricsFromFmp(symbol);
-    const peRatio =
-      metrics?.peRatio ?? metrics?.priceEarningsRatio ?? null;
-    return { symbol: symbol.toLowerCase(), peRatio };
-  });
-
-  const peRatioResults = await Promise.all(peRatioPromises);
-  for (const { symbol, peRatio } of peRatioResults) {
-    peRatios[symbol] = peRatio;
-  }
 
   for (const symbol of symbolsToCompare) {
     const historicalDataArray = await getHistoricalData(
@@ -217,10 +168,7 @@ export async function GET() {
 
     if (historicalDataArray.length > 0) {
       allHistoricalData[symbol.toLowerCase()] = historicalDataArray.map(
-        (d) => ({
-          date: d.date,
-          close: d.close,
-        })
+        (d) => ({ date: d.date, close: d.close })
       );
       const performanceData = calculatePerformance(
         symbol,
@@ -248,32 +196,85 @@ export async function GET() {
   const resVTV = results.find((r) => r.symbol === "VTV");
 
   const comparisonDeltas: { [key: string]: string | number } = {};
-  const benchmarkSymbol = "IWV";
-  const symbolsForDelta = ["EBI", "IWN", "VTV", "VTI"];
 
-  const benchmarkResult = results.find((r) => r.symbol === benchmarkSymbol);
-
-  if (benchmarkResult && benchmarkResult.performance !== undefined) {
-    for (const sym of symbolsForDelta) {
-      const symResult = results.find((r) => r.symbol === sym);
-      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
-
-      if (symResult && symResult.performance !== undefined) {
-        comparisonDeltas[deltaKey] = parseFloat(
-          (symResult.performance - benchmarkResult.performance).toFixed(2)
-        );
-      } else {
-        comparisonDeltas[deltaKey] =
-          `N/A (missing performance for ${sym} or ${benchmarkSymbol})`;
-      }
-    }
+  if (resEBI?.performance !== undefined && resVTI?.performance !== undefined) {
+    comparisonDeltas["ebi_vti"] = parseFloat(
+      (resEBI.performance - resVTI.performance).toFixed(2)
+    );
   } else {
-    // If benchmark (IWV) data is missing, all deltas against it are N/A
-    for (const sym of symbolsForDelta) {
-      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
-      comparisonDeltas[deltaKey] =
-        `N/A (missing performance for ${benchmarkSymbol})`;
-    }
+    comparisonDeltas["ebi_vti"] = "N/A (missing performance data)";
+  }
+
+  if (resEBI?.performance !== undefined && resIWV?.performance !== undefined) {
+    comparisonDeltas["ebi_iwv"] = parseFloat(
+      (resEBI.performance - resIWV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["ebi_iwv"] = "N/A (missing performance data)";
+  }
+
+  if (resEBI?.performance !== undefined && resIWN?.performance !== undefined) {
+    comparisonDeltas["ebi_iwn"] = parseFloat(
+      (resEBI.performance - resIWN.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["ebi_iwn"] = "N/A (missing performance data)";
+  }
+
+  if (resEBI?.performance !== undefined && resVTV?.performance !== undefined) {
+    comparisonDeltas["ebi_vtv"] = parseFloat(
+      (resEBI.performance - resVTV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["ebi_vtv"] = "N/A (missing performance data)";
+  }
+
+  if (resVTI?.performance !== undefined && resIWV?.performance !== undefined) {
+    comparisonDeltas["vti_iwv"] = parseFloat(
+      (resVTI.performance - resIWV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["vti_iwv"] = "N/A (missing performance data)";
+  }
+
+  if (resVTI?.performance !== undefined && resIWN?.performance !== undefined) {
+    comparisonDeltas["vti_iwn"] = parseFloat(
+      (resVTI.performance - resIWN.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["vti_iwn"] = "N/A (missing performance data)";
+  }
+
+  if (resVTI?.performance !== undefined && resVTV?.performance !== undefined) {
+    comparisonDeltas["vti_vtv"] = parseFloat(
+      (resVTI.performance - resVTV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["vti_vtv"] = "N/A (missing performance data)";
+  }
+
+  if (resIWV?.performance !== undefined && resIWN?.performance !== undefined) {
+    comparisonDeltas["iwv_iwn"] = parseFloat(
+      (resIWV.performance - resIWN.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["iwv_iwn"] = "N/A (missing performance data)";
+  }
+
+  if (resIWV?.performance !== undefined && resVTV?.performance !== undefined) {
+    comparisonDeltas["iwv_vtv"] = parseFloat(
+      (resIWV.performance - resVTV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["iwv_vtv"] = "N/A (missing performance data)";
+  }
+
+  if (resIWN?.performance !== undefined && resVTV?.performance !== undefined) {
+    comparisonDeltas["iwn_vtv"] = parseFloat(
+      (resIWN.performance - resVTV.performance).toFixed(2)
+    );
+  } else {
+    comparisonDeltas["iwn_vtv"] = "N/A (missing performance data)";
   }
 
   const finalJsonOutput = {
@@ -290,7 +291,6 @@ export async function GET() {
             endDate: resEBI?.endDate,
             endPrice: resEBI?.endPrice,
             performance: resEBI?.performance?.toFixed(2) + "%",
-            peRatio: peRatios.ebi,
           },
       vti: resVTI?.error
         ? { error: resVTI.error }
@@ -300,7 +300,6 @@ export async function GET() {
             endDate: resVTI?.endDate,
             endPrice: resVTI?.endPrice,
             performance: resVTI?.performance?.toFixed(2) + "%",
-            peRatio: peRatios.vti,
           },
       iwv: resIWV?.error
         ? { error: resIWV.error }
@@ -310,7 +309,6 @@ export async function GET() {
             endDate: resIWV?.endDate,
             endPrice: resIWV?.endPrice,
             performance: resIWV?.performance?.toFixed(2) + "%",
-            peRatio: peRatios.iwv,
           },
       iwn: resIWN?.error
         ? { error: resIWN.error }
@@ -320,7 +318,6 @@ export async function GET() {
             endDate: resIWN?.endDate,
             endPrice: resIWN?.endPrice,
             performance: resIWN?.performance?.toFixed(2) + "%",
-            peRatio: peRatios.iwn,
           },
       vtv: resVTV?.error
         ? { error: resVTV.error }
@@ -330,7 +327,6 @@ export async function GET() {
             endDate: resVTV?.endDate,
             endPrice: resVTV?.endPrice,
             performance: resVTV?.performance?.toFixed(2) + "%",
-            peRatio: peRatios.vtv,
           },
     },
     performanceDeltas: comparisonDeltas,
@@ -338,22 +334,6 @@ export async function GET() {
     deltaNote:
       "Positive delta means the first symbol performed better than the second by that percentage point difference.",
   };
-
-  // Store in cache
-  try {
-    await setPerformanceCache(
-      db,
-      cacheKey,
-      endDateStr,
-      JSON.stringify(finalJsonOutput)
-    );
-    console.log("[EBI API] Result cached successfully");
-  } catch (error) {
-    console.warn("[EBI API] Error caching result:", error);
-    // Continue even if caching fails
-  } finally {
-    db.close();
-  }
 
   console.log("[EBI API] Returning JSON result");
   return NextResponse.json(finalJsonOutput);

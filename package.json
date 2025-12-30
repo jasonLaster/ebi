@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run --bun next dev",
     "build": "bun run --bun next build",
+    "inngest": "bunx inngest-cli@latest dev",
     "lint": "eslint .",
     "gh:logs": "bun scripts/gh-run-logs.ts",
     "test": "bun test",
@@ -14,7 +15,8 @@
     "fetch:all": "bun scripts/fetch-holdings.ts --all",
     "approximate": "bun scripts/approximate-holdings.ts",
     "sync": "bun scripts/sync.ts",
-    "download:pdf": "bun scripts/download-holdings-pdf.ts"
+    "download:pdf": "bun scripts/download-holdings-pdf.ts",
+    "test:pe-ratio": "bun test scripts/test-pe-ratio.test.ts"
   },
   "author": "",
   "license": "ISC",
@@ -22,6 +24,7 @@
     "@hookform/resolvers": "^3.9.1",
     "@hyperbrowser/sdk": "^0.80.1",
     "@libsql/client": "^0.15.15",
+    "@react-email/components": "^0.0.25",
     "@napi-rs/canvas": "^0.1.86",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -60,6 +63,7 @@
     "dotenv": "^16.5.0",
     "embla-carousel-react": "8.5.1",
     "fmin": "^0.0.4",
+    "inngest": "^3.34.4",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "ml-matrix": "^6.10.0",
@@ -72,6 +76,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "latest",
+    "resend": "^4.0.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
