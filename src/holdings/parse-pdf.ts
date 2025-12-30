@@ -403,9 +403,11 @@ export async function parsePdfToHoldingsData(
   if (Object.keys(holdings).length === 0) {
     throw new Error("No holdings found. Check the PDF format.");
   }
+  const now = new Date();
   return {
     etfSymbol: "EBI",
-    lastUpdated: new Date().toISOString(),
+    date: now.toISOString().slice(0, 10), // YYYY-MM-DD
+    lastUpdated: now.toISOString(),
     holdings,
   };
 }

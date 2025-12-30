@@ -24,8 +24,10 @@ describe("approximation (Turso-backed)", () => {
     try {
       // Construct a toy problem where EBI is exactly 75% VTI + 25% IWN.
       // Use actual_weight everywhere (same as weight in this fixture).
+      const today = new Date().toISOString().slice(0, 10);
       await writeEtf(db, {
         etfSymbol: "VTI",
+        date: today,
         lastUpdated: new Date().toISOString(),
         holdings: {
           AAA: {
@@ -49,6 +51,7 @@ describe("approximation (Turso-backed)", () => {
 
       await writeEtf(db, {
         etfSymbol: "IWN",
+        date: today,
         lastUpdated: new Date().toISOString(),
         holdings: {
           AAA: {
@@ -72,6 +75,7 @@ describe("approximation (Turso-backed)", () => {
 
       await writeEtf(db, {
         etfSymbol: "VTV",
+        date: today,
         lastUpdated: new Date().toISOString(),
         holdings: {
           AAA: {
@@ -95,6 +99,7 @@ describe("approximation (Turso-backed)", () => {
 
       await writeEtf(db, {
         etfSymbol: "EBI",
+        date: today,
         lastUpdated: new Date().toISOString(),
         holdings: {
           // 0.75*VTI + 0*VTV + 0.25*IWN:
@@ -159,6 +164,7 @@ describe("approximation (Turso-backed)", () => {
     try {
       await writeEtf(db, {
         etfSymbol: "EBI",
+        date: new Date().toISOString().slice(0, 10),
         lastUpdated: new Date().toISOString(),
         holdings: {
           AAA: {
