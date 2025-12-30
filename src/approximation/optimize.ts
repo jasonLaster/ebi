@@ -117,7 +117,7 @@ export async function runApproximation(
   const TEST_SYMBOLS = new Set(["AAA", "BBB"]);
   const symbolsBeforeFilter = symbols.length;
   symbols = symbols.filter((sym) => !TEST_SYMBOLS.has(sym.toUpperCase()));
-  
+
   // Warn if test symbols were found and filtered
   const filteredCount = symbolsBeforeFilter - symbols.length;
   if (filteredCount > 0) {
@@ -154,8 +154,8 @@ export async function runApproximation(
   }
 
   // Normalize: divide each vector by its sum (unless sum is zero or very small)
-  const H_target = H_target_raw.map(
-    (w) => (targetSum > 1e-10 ? w / targetSum : 0)
+  const H_target = H_target_raw.map((w) =>
+    targetSum > 1e-10 ? w / targetSum : 0
   );
   const H_columns = H_columns_raw.map((col, idx) =>
     col.map((w) => (baselineSums[idx] > 1e-10 ? w / baselineSums[idx] : 0))

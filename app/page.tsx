@@ -11,7 +11,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowDownIcon, ArrowUpIcon, InfoIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  DownloadIcon,
+  InfoIcon,
+} from "lucide-react";
 import {
   Tooltip as UITooltip,
   TooltipContent,
@@ -41,6 +46,7 @@ interface PerformanceData {
   endDate?: string;
   endPrice?: number;
   performance?: string; // This is a string like "-4.71%"
+  peRatio?: number | null; // P/E ratio
   error?: string; // Error specific to this symbol's performance calculation
 }
 
@@ -530,6 +536,12 @@ export default function ETFDashboard() {
                 scope="col"
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
               >
+                P/E Ratio
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
                 Actions
               </th>
             </tr>
@@ -593,6 +605,17 @@ export default function ETFDashboard() {
                     <span className="text-gray-400">N/A</span>
                   )}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sm:px-6">
+                  {item.perfData &&
+                  item.perfData.peRatio !== null &&
+                  item.perfData.peRatio !== undefined ? (
+                    <span className="font-medium">
+                      {item.perfData.peRatio.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
                   <Button
                     variant="outline"
@@ -647,6 +670,18 @@ export default function ETFDashboard() {
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 sm:px-6">
                 Baseline
               </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 sm:px-6">
+                {benchmarkSymbolData.perfData &&
+                benchmarkSymbolData.perfData.peRatio !== null &&
+                benchmarkSymbolData.perfData.peRatio !== undefined ? (
+                  <span className="font-medium">
+                    {benchmarkSymbolData.perfData.peRatio.toFixed(2)}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">N/A</span>
+                )}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm sm:px-6"></td>
             </tr>
 
             {/* VTI Row (after separator) */}
@@ -703,6 +738,17 @@ export default function ETFDashboard() {
                         <ArrowUpIcon className="mr-1 h-4 w-4 flex-shrink-0" />
                       )}
                       {(performanceDeltas[item.deltaKey] as number).toFixed(2)}%
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 sm:px-6">
+                  {item.perfData &&
+                  item.perfData.peRatio !== null &&
+                  item.perfData.peRatio !== undefined ? (
+                    <span className="font-medium">
+                      {item.perfData.peRatio.toFixed(2)}
                     </span>
                   ) : (
                     <span className="text-gray-400">N/A</span>

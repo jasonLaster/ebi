@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { openHoldingsDb, getPerformanceCache, setPerformanceCache } from "@/src/lib/db";
+import {
+  openHoldingsDb,
+  getPerformanceCache,
+  setPerformanceCache,
+} from "@/src/lib/db";
+import { fetchKeyMetricsFromFmp } from "@/src/lib/fmp-api";
 
 // Debug: API route loaded
 console.log("[EBI API] route.ts loaded");
@@ -160,7 +165,8 @@ export async function GET() {
   const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
 
   // Generate cache key based on start date and symbols
-  const cacheKey = `performance_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
+  // Include version "v2" to invalidate old cache that didn't have peRatio
+  const cacheKey = `performance_v2_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
 
   // Try to get from cache
   const db = await openHoldingsDb();
@@ -175,7 +181,10 @@ export async function GET() {
       return NextResponse.json(cachedData);
     }
   } catch (error) {
-    console.warn("[EBI API] Error reading cache, proceeding with fresh fetch:", error);
+    console.warn(
+      "[EBI API] Error reading cache, proceeding with fresh fetch:",
+      error
+    );
   }
 
   // Cache miss or error - fetch fresh data
@@ -184,6 +193,20 @@ export async function GET() {
   const allHistoricalData: {
     [symbol: string]: { date: string; close: number }[] | { error: string };
   } = {};
+  const peRatios: Record<string, number | null> = {};
+
+  // Fetch P/E ratios for all symbols in parallel
+  const peRatioPromises = symbolsToCompare.map(async (symbol) => {
+    const metrics = await fetchKeyMetricsFromFmp(symbol);
+    const peRatio =
+      metrics?.peRatio ?? metrics?.priceEarningsRatio ?? null;
+    return { symbol: symbol.toLowerCase(), peRatio };
+  });
+
+  const peRatioResults = await Promise.all(peRatioPromises);
+  for (const { symbol, peRatio } of peRatioResults) {
+    peRatios[symbol] = peRatio;
+  }
 
   for (const symbol of symbolsToCompare) {
     const historicalDataArray = await getHistoricalData(
@@ -267,6 +290,7 @@ export async function GET() {
             endDate: resEBI?.endDate,
             endPrice: resEBI?.endPrice,
             performance: resEBI?.performance?.toFixed(2) + "%",
+            peRatio: peRatios.ebi,
           },
       vti: resVTI?.error
         ? { error: resVTI.error }
@@ -276,6 +300,7 @@ export async function GET() {
             endDate: resVTI?.endDate,
             endPrice: resVTI?.endPrice,
             performance: resVTI?.performance?.toFixed(2) + "%",
+            peRatio: peRatios.vti,
           },
       iwv: resIWV?.error
         ? { error: resIWV.error }
@@ -285,6 +310,7 @@ export async function GET() {
             endDate: resIWV?.endDate,
             endPrice: resIWV?.endPrice,
             performance: resIWV?.performance?.toFixed(2) + "%",
+            peRatio: peRatios.iwv,
           },
       iwn: resIWN?.error
         ? { error: resIWN.error }
@@ -294,6 +320,7 @@ export async function GET() {
             endDate: resIWN?.endDate,
             endPrice: resIWN?.endPrice,
             performance: resIWN?.performance?.toFixed(2) + "%",
+            peRatio: peRatios.iwn,
           },
       vtv: resVTV?.error
         ? { error: resVTV.error }
@@ -303,6 +330,7 @@ export async function GET() {
             endDate: resVTV?.endDate,
             endPrice: resVTV?.endPrice,
             performance: resVTV?.performance?.toFixed(2) + "%",
+            peRatio: peRatios.vtv,
           },
     },
     performanceDeltas: comparisonDeltas,
@@ -313,7 +341,12 @@ export async function GET() {
 
   // Store in cache
   try {
-    await setPerformanceCache(db, cacheKey, endDateStr, JSON.stringify(finalJsonOutput));
+    await setPerformanceCache(
+      db,
+      cacheKey,
+      endDateStr,
+      JSON.stringify(finalJsonOutput)
+    );
     console.log("[EBI API] Result cached successfully");
   } catch (error) {
     console.warn("[EBI API] Error caching result:", error);
