@@ -20,13 +20,70 @@ export async function openHoldingsDb(): Promise<HoldingsDb> {
 }
 
 export async function ensureSchema(db: HoldingsDb): Promise<void> {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS etfs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      symbol TEXT NOT NULL UNIQUE,
-      last_updated TEXT NOT NULL
-    )
-  `);
+  // Check if we need to migrate from old schema (without date column)
+  const tableInfo = await db.execute(
+    `PRAGMA table_info(etfs)`
+  );
+  const hasDateColumn = tableInfo.rows.some(
+    (row) => row.name === "date"
+  );
+
+  if (!hasDateColumn) {
+    // Check if the etfs table exists
+    const tableExists = await db.execute(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='etfs'`
+    );
+
+    if (tableExists.rows.length > 0) {
+      // Migration: Add date column and update existing rows
+      // 1. Add date column with a default value
+      await db.execute(`
+        ALTER TABLE etfs ADD COLUMN date TEXT
+      `);
+
+      // 2. Backfill date from last_updated (extract YYYY-MM-DD)
+      await db.execute(`
+        UPDATE etfs SET date = substr(last_updated, 1, 10) WHERE date IS NULL
+      `);
+
+      // 3. Drop old unique constraint and create new one
+      // SQLite doesn't support dropping constraints directly, so we need to recreate the table
+      // However, since we're adding a new composite unique, we'll create a new unique index instead
+      // First, drop the old unique index if it exists (SQLite auto-creates one for UNIQUE constraint)
+      try {
+        await db.execute(`DROP INDEX IF EXISTS sqlite_autoindex_etfs_1`);
+      } catch {
+        // Index may not exist or have a different name, ignore
+      }
+
+      // Create the new composite unique index
+      await db.execute(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_etfs_symbol_date ON etfs(symbol, date)
+      `);
+    } else {
+      // Create new table with date column
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS etfs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          date TEXT NOT NULL,
+          last_updated TEXT NOT NULL,
+          UNIQUE(symbol, date)
+        )
+      `);
+    }
+  } else {
+    // Schema is up to date, just ensure table exists (no-op if already exists)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS etfs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        date TEXT NOT NULL,
+        last_updated TEXT NOT NULL,
+        UNIQUE(symbol, date)
+      )
+    `);
+  }
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS holdings (
@@ -65,34 +122,40 @@ export async function ensureSchema(db: HoldingsDb): Promise<void> {
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)
   `);
+
+  // Ensure the composite unique index exists (for both new and migrated DBs)
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_etfs_symbol_date ON etfs(symbol, date)
+  `);
 }
 
 export async function upsertEtf(
   db: HoldingsDb,
   symbol: string,
+  date: string,
   lastUpdated: string
 ): Promise<number> {
   const upper = symbol.toUpperCase();
   await db.execute({
     sql: `
-      INSERT INTO etfs(symbol, last_updated)
-      VALUES (?, ?)
-      ON CONFLICT(symbol) DO UPDATE SET last_updated = excluded.last_updated
+      INSERT INTO etfs(symbol, date, last_updated)
+      VALUES (?, ?, ?)
+      ON CONFLICT(symbol, date) DO UPDATE SET last_updated = excluded.last_updated
     `,
-    args: [upper, lastUpdated],
+    args: [upper, date, lastUpdated],
   });
 
   const result = await db.execute({
-    sql: `SELECT id FROM etfs WHERE symbol = ?`,
-    args: [upper],
+    sql: `SELECT id FROM etfs WHERE symbol = ? AND date = ?`,
+    args: [upper, date],
   });
 
   if (result.rows.length === 0) {
-    throw new Error(`Failed to upsert ETF row for ${upper}`);
+    throw new Error(`Failed to upsert ETF row for ${upper} on ${date}`);
   }
   const id = result.rows[0].id;
   if (typeof id !== "number") {
-    throw new Error(`Failed to upsert ETF row for ${upper}: invalid id`);
+    throw new Error(`Failed to upsert ETF row for ${upper} on ${date}: invalid id`);
   }
   return id;
 }
@@ -135,14 +198,47 @@ export async function storeHoldingsData(
   db: HoldingsDb,
   data: HoldingsData
 ): Promise<void> {
-  const etfId = await upsertEtf(db, data.etfSymbol, data.lastUpdated);
+  const etfId = await upsertEtf(db, data.etfSymbol, data.date, data.lastUpdated);
   await upsertHoldingsForEtf(db, etfId, data.holdings);
+}
+
+/**
+ * Check if holdings exist for a specific ETF and date
+ */
+export async function hasHoldingsForDate(
+  db: HoldingsDb,
+  symbol: string,
+  date: string
+): Promise<boolean> {
+  const result = await db.execute({
+    sql: `SELECT 1 FROM etfs WHERE symbol = ? AND date = ?`,
+    args: [symbol.toUpperCase(), date],
+  });
+  return result.rows.length > 0;
+}
+
+/**
+ * Get the most recent holdings date for an ETF
+ */
+export async function getLatestHoldingsDate(
+  db: HoldingsDb,
+  symbol: string
+): Promise<string | null> {
+  const result = await db.execute({
+    sql: `SELECT date FROM etfs WHERE symbol = ? ORDER BY date DESC LIMIT 1`,
+    args: [symbol.toUpperCase()],
+  });
+  if (result.rows.length === 0) {
+    return null;
+  }
+  const date = result.rows[0].date;
+  return typeof date === "string" ? date : null;
 }
 
 export async function getHoldingsWeightMap(
   db: HoldingsDb,
   etfSymbol: string,
-  opts?: { weightField?: "weight" | "actual_weight" }
+  opts?: { weightField?: "weight" | "actual_weight"; date?: string }
 ): Promise<Map<string, number>> {
   const symbol = etfSymbol.toUpperCase();
   const weightField = opts?.weightField ?? "actual_weight";
@@ -150,15 +246,35 @@ export async function getHoldingsWeightMap(
     throw new Error(`Unsupported weightField: ${String(weightField)}`);
   }
 
-  const result = await db.execute({
-    sql: `
-      SELECT h.ticker as ticker, h.${weightField} as weight
-      FROM holdings h
-      JOIN etfs e ON e.id = h.etf_id
-      WHERE e.symbol = ?
-    `,
-    args: [symbol],
-  });
+  // If no date specified, use the latest available date
+  let dateFilter = opts?.date;
+  if (!dateFilter) {
+    dateFilter = await getLatestHoldingsDate(db, symbol) ?? undefined;
+  }
+
+  let result;
+  if (dateFilter) {
+    result = await db.execute({
+      sql: `
+        SELECT h.ticker as ticker, h.${weightField} as weight
+        FROM holdings h
+        JOIN etfs e ON e.id = h.etf_id
+        WHERE e.symbol = ? AND e.date = ?
+      `,
+      args: [symbol, dateFilter],
+    });
+  } else {
+    // Fallback: no date in DB yet, get any holdings for this symbol
+    result = await db.execute({
+      sql: `
+        SELECT h.ticker as ticker, h.${weightField} as weight
+        FROM holdings h
+        JOIN etfs e ON e.id = h.etf_id
+        WHERE e.symbol = ?
+      `,
+      args: [symbol],
+    });
+  }
 
   const map = new Map<string, number>();
   for (const row of result.rows) {

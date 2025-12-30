@@ -1,7 +1,6 @@
 import {
   HoldingsDb,
   getHoldingsWeightMap,
-  getAllUniqueSymbols,
 } from "@/src/lib/db";
 import { Alglib } from "./alglib.js";
 

@@ -18,9 +18,11 @@ export async function fetchEtfHoldings(
   const upper = symbol.toUpperCase();
   const raw = await fetchEtfHoldingsFromFmp(upper, opts);
   const holdings = normalizeFmpHoldingsToMap(upper, raw);
+  const now = new Date();
   return {
     etfSymbol: upper,
-    lastUpdated: new Date().toISOString(),
+    date: now.toISOString().slice(0, 10), // YYYY-MM-DD
+    lastUpdated: now.toISOString(),
     holdings,
   };
 }

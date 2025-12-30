@@ -4,8 +4,8 @@ import * as path from "path";
 
 import { downloadHoldingsPdf } from "@/scripts/download-holdings-pdf";
 import { parsePdfToJson } from "@/src/holdings/parse-pdf";
-import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
-import { openHoldingsDb } from "@/src/lib/db";
+import { fetchAndStoreEtfHoldings } from "@/src/holdings/fetch";
+import { openHoldingsDb, hasHoldingsForDate } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
 
 export const maxDuration = 300; // seconds (Vercel will cap based on your plan)
@@ -85,15 +85,28 @@ export async function GET(request: Request) {
         });
         console.log("✅ PDF parsed and stored in database");
 
-        // Step 3: Fetch baseline ETF holdings
+        // Step 3: Fetch baseline ETF holdings (with cache check)
         console.log("");
         console.log("Step 3/4: Fetching baseline ETF holdings...");
-        const { outputs } = await fetchAndStoreManyEtfHoldings(baselines, {
-          outDir: baseDir,
-          db,
-        });
-        for (const o of outputs) {
-          console.log(`✅ ${o.symbol} → ${o.jsonPath}`);
+        const today = new Date().toISOString().slice(0, 10);
+        const outputs: { symbol: string; jsonPath: string }[] = [];
+
+        for (const s of baselines) {
+          const cached = await hasHoldingsForDate(db, s, today);
+          if (cached) {
+            console.log(`✓ ${s} holdings already cached for ${today}`);
+            outputs.push({
+              symbol: s,
+              jsonPath: path.join(baseDir, `${s.toLowerCase()}_holdings.json`),
+            });
+            continue;
+          }
+          const result = await fetchAndStoreEtfHoldings(s, {
+            outDir: baseDir,
+            db,
+          });
+          console.log(`✅ ${result.symbol} → ${result.jsonPath}`);
+          outputs.push(result);
         }
       } else {
         console.log("⏭️  TEST MODE: Skipping PDF download and baseline fetch");

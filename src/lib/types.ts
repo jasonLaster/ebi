@@ -9,6 +9,7 @@ export interface Holding {
 
 export interface HoldingsData {
   etfSymbol: string;
+  date: string; // YYYY-MM-DD format
   lastUpdated: string;
   holdings: Record<string, Holding>;
 }

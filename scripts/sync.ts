@@ -3,8 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { Command } from "commander";
 import { parsePdfToJson } from "@/src/holdings/parse-pdf";
-import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
-import { openHoldingsDb } from "@/src/lib/db";
+import { fetchAndStoreEtfHoldings } from "@/src/holdings/fetch";
+import { openHoldingsDb, hasHoldingsForDate } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
 import { downloadHoldingsPdf } from "./download-holdings-pdf";
 
@@ -115,17 +115,32 @@ async function main(): Promise<void> {
       db,
     });
 
-    // Step 2: Fetch baseline ETF holdings -> JSON + Turso
+    // Step 2: Fetch baseline ETF holdings -> JSON + Turso (with cache check)
     console.log("");
     console.log(
       `Step 2/3: Fetching baseline holdings → ${outDir}/*_holdings.json (+Turso)`
     );
-    const { outputs } = await fetchAndStoreManyEtfHoldings(baselines, {
-      outDir,
-      db,
-      apiKey: opts.apiKey,
-    });
-    for (const o of outputs) console.log(`✅ ${o.symbol} → ${o.jsonPath}`);
+    const today = new Date().toISOString().slice(0, 10);
+    const outputs: { symbol: string; jsonPath: string }[] = [];
+
+    for (const s of baselines) {
+      const cached = await hasHoldingsForDate(db, s, today);
+      if (cached) {
+        console.log(`✓ ${s} holdings already cached for ${today}`);
+        outputs.push({
+          symbol: s,
+          jsonPath: path.join(outDir, `${s.toLowerCase()}_holdings.json`),
+        });
+        continue;
+      }
+      const result = await fetchAndStoreEtfHoldings(s, {
+        outDir,
+        db,
+        apiKey: opts.apiKey,
+      });
+      console.log(`✅ ${result.symbol} → ${result.jsonPath}`);
+      outputs.push(result);
+    }
 
     // Step 3: Run approximation from DB -> results JSON
     console.log("");
