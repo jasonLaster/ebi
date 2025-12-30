@@ -3,6 +3,7 @@ import {
   getHoldingsWeightMap,
   getAllUniqueSymbols,
 } from "@/src/lib/db";
+import { isTestSymbol, TEST_SYMBOLS } from "@/src/lib/types";
 import { Alglib } from "./alglib.js";
 
 export interface OptimizationMetrics {
@@ -114,15 +115,15 @@ export async function runApproximation(
   let symbols = Array.from(relevantSymbols).sort();
 
   // Filter out test symbols (AAA, BBB) as a safety measure
-  const TEST_SYMBOLS = new Set(["AAA", "BBB"]);
   const symbolsBeforeFilter = symbols.length;
-  symbols = symbols.filter((sym) => !TEST_SYMBOLS.has(sym.toUpperCase()));
-  
+  symbols = symbols.filter((sym) => !isTestSymbol(sym));
+
   // Warn if test symbols were found and filtered
   const filteredCount = symbolsBeforeFilter - symbols.length;
   if (filteredCount > 0) {
+    const testSymbolsList = Array.from(TEST_SYMBOLS).join(", ");
     console.warn(
-      `⚠️  Warning: Filtered out ${filteredCount} test symbol(s) (AAA, BBB) from optimization`
+      `⚠️  Warning: Filtered out ${filteredCount} test symbol(s) (${testSymbolsList}) from optimization`
     );
   }
 

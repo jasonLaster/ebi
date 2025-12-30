@@ -59,7 +59,7 @@ The fixes ensure these issues don't break the optimization, but fixing the root 
 - `src/approximation/optimize.ts` - Main optimization logic with all fixes
 - `scripts/qa-approximation.ts` - New diagnostic script
 - `scripts/qa-weight-sums.ts` - New diagnostic script for weight analysis
-- `docs/QA_APPROXIMATION_REPORT.md` - Detailed QA report
+- `QA_APPROXIMATION_REPORT.md` - Detailed QA report
 
 ## Testing
 

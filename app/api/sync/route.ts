@@ -4,7 +4,10 @@ import * as path from "path";
 
 import { downloadHoldingsPdf } from "@/scripts/download-holdings-pdf";
 import { parsePdfToJson } from "@/src/holdings/parse-pdf";
-import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
+import {
+  fetchAndStoreManyEtfHoldings,
+  fetchAndStoreManyPeRatios,
+} from "@/src/holdings/fetch";
 import { openHoldingsDb } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
 
@@ -103,20 +106,37 @@ export async function GET(request: Request) {
       // Step 4: Run approximation
       console.log("");
       console.log(
-        `Step ${testMode ? "1" : "4"}/${testMode ? "1" : "4"}: Running portfolio approximation...`
+        `Step ${testMode ? "1" : "4"}/${testMode ? "1" : "5"}: Running portfolio approximation...`
       );
       const results = await runApproximation(db, target, baselines, {
         weightField: "actual_weight",
       });
 
-      console.log("");
-      console.log(`✅ ${testMode ? "Test" : "Sync"} complete!`);
       console.log(`📊 Optimization metrics:`, {
         improvementPercent:
           results.optimizationMetrics.improvementPercent.toFixed(2) + "%",
         averageError: results.optimizationMetrics.averageError.toFixed(6),
         maxError: results.optimizationMetrics.maxError.toFixed(6),
       });
+
+      // Step 5: Fetch P/E ratios for all ETFs
+      console.log("");
+      console.log(
+        `Step ${testMode ? "2" : "5"}/${testMode ? "2" : "5"}: Fetching P/E ratios for all holdings...`
+      );
+      const allEtfs = [target, ...baselines];
+      const peResults = await fetchAndStoreManyPeRatios(allEtfs, { db });
+      
+      console.log("📊 P/E ratio summary:");
+      for (const pe of peResults.results) {
+        console.log(
+          `  ${pe.symbol}: ${pe.weightedPe?.toFixed(2) ?? "N/A"} ` +
+            `(${pe.holdingsWithPe}/${pe.totalHoldings} holdings, ${pe.weightCoverage.toFixed(1)}% coverage)`
+        );
+      }
+
+      console.log("");
+      console.log(`✅ ${testMode ? "Test" : "Sync"} complete!`);
 
       return NextResponse.json({
         success: true,
@@ -136,6 +156,14 @@ export async function GET(request: Request) {
           totalStocks: results.optimizationMetrics.totalStocks,
         },
         constraints: results.constraints,
+        peRatios: peResults.results.map((r) => ({
+          symbol: r.symbol,
+          weightedPe: r.weightedPe,
+          holdingsWithPe: r.holdingsWithPe,
+          totalHoldings: r.totalHoldings,
+          weightCoverage: r.weightCoverage,
+        })),
+        peRatioSyncTime: peResults.totalTime,
       });
     } finally {
       db.close();
