@@ -205,9 +205,9 @@ export function PortfolioComparison({
   if (loading || !weights) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Portfolio Performance Comparison</CardTitle>
-          <CardDescription>Loading performance data...</CardDescription>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Portfolio Performance Comparison</CardTitle>
+          <CardDescription className="text-sm">Loading performance data...</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -216,9 +216,9 @@ export function PortfolioComparison({
   if (error || performanceData.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Portfolio Performance Comparison</CardTitle>
-          <CardDescription className="text-red-500">
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Portfolio Performance Comparison</CardTitle>
+          <CardDescription className="text-red-500 text-sm">
             {error || "No performance data available"}
           </CardDescription>
         </CardHeader>
@@ -241,9 +241,9 @@ export function PortfolioComparison({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Portfolio Performance Comparison</CardTitle>
-        <CardDescription>
+      <CardHeader className="p-4 md:p-6">
+        <CardTitle className="text-lg md:text-xl">Portfolio Performance Comparison</CardTitle>
+        <CardDescription className="text-sm">
           Comparing actual EBI performance vs approximated portfolio performance
           <br />
           <span className="text-xs text-gray-500">
@@ -253,55 +253,57 @@ export function PortfolioComparison({
           </span>
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 md:space-y-6 p-4 md:p-6">
         {/* Performance Summary */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+          <div className="text-center p-3 md:p-4 bg-blue-50 rounded-lg">
+            <div className="text-xl md:text-2xl font-bold text-blue-600">
               {ebiPerformance.toFixed(2)}%
             </div>
-            <div className="text-sm text-gray-600">EBI Performance</div>
+            <div className="text-xs md:text-sm text-gray-600">EBI Performance</div>
           </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">
+          <div className="text-center p-3 md:p-4 bg-green-50 rounded-lg">
+            <div className="text-xl md:text-2xl font-bold text-green-600">
               {approximatedPerformance.toFixed(2)}%
             </div>
-            <div className="text-sm text-gray-600">
+            <div className="text-xs md:text-sm text-gray-600">
               Approximated Performance
             </div>
           </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
+          <div className="text-center p-3 md:p-4 bg-purple-50 rounded-lg">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-xl md:text-2xl font-bold ${
                 trackingDifference >= 0 ? "text-green-600" : "text-red-600"
               }`}
             >
               {trackingDifference >= 0 ? "+" : ""}
               {trackingDifference.toFixed(2)}%
             </div>
-            <div className="text-sm text-gray-600">Tracking Difference</div>
+            <div className="text-xs md:text-sm text-gray-600">Tracking Difference</div>
           </div>
         </div>
 
         {/* Performance Chart */}
-        <div className="h-[400px]">
+        <div className="h-[280px] md:h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={performanceData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatDate}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
               />
               <YAxis
                 domain={[90, 120]}
                 tickFormatter={(value) => `${value.toFixed(0)}%`}
+                tick={{ fontSize: 10 }}
+                width={40}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
               <ReferenceLine y={100} stroke="#666" strokeDasharray="3 3" />
               <Line
                 type="monotone"
@@ -314,7 +316,7 @@ export function PortfolioComparison({
               />
               <Line
                 type="monotone"
-                name="Approximated Portfolio"
+                name="Approximated"
                 dataKey="approximated"
                 stroke="#82ca9d"
                 strokeWidth={2}
@@ -326,18 +328,18 @@ export function PortfolioComparison({
         </div>
 
         {/* Tracking Error Analysis */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-semibold mb-2">Tracking Error Analysis</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
+        <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+          <h4 className="font-semibold mb-2 text-sm md:text-base">Tracking Error Analysis</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 text-xs md:text-sm">
+            <div className="flex justify-between sm:block">
               <span className="text-gray-600">Average Tracking Error:</span>
-              <span className="font-medium ml-2">
+              <span className="font-medium sm:ml-2">
                 {avgTrackingError.toFixed(2)}%
               </span>
             </div>
-            <div>
+            <div className="flex justify-between sm:block">
               <span className="text-gray-600">Final Tracking Error:</span>
-              <span className="font-medium ml-2">
+              <span className="font-medium sm:ml-2">
                 {trackingDifference.toFixed(2)}%
               </span>
             </div>

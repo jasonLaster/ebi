@@ -490,15 +490,15 @@ export default function ETFDashboard() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">ETF Performance Dashboard</h1>
-      <p className="text-gray-500 mb-8">
+    <div className="container mx-auto px-4 py-4 md:px-6 md:py-8">
+      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 md:mb-6">ETF Performance Dashboard</h1>
+      <p className="text-gray-500 mb-4 md:mb-8 text-sm md:text-base">
         {formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}
       </p>
 
       {/* Performance Summary Table - REPLACES THE CARDS */}
-      <div className="mb-8 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
+      <div className="mb-4 md:mb-8 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg text-sm md:text-base">
           <thead className="bg-gray-50">
             <tr>
               <th
@@ -697,28 +697,28 @@ export default function ETFDashboard() {
       </div>
 
       {/* Portfolio Approximation Section */}
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <PortfolioApproximation />
       </div>
 
       {/* Portfolio Comparison Section */}
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <PortfolioComparison />
       </div>
 
       {/* Charts Section */}
-      <div className="space-y-8">
+      <div className="space-y-4 md:space-y-8">
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Performance Chart</CardTitle>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-lg md:text-xl">Performance Chart</CardTitle>
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <InfoIcon className="h-4 w-4 text-gray-400" />
+                    <InfoIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-xs">
+                    <p className="max-w-xs text-sm">
                       Normalized percentage change from start date (top chart).
                       Delta percentage change against IWV (bottom chart).
                     </p>
@@ -727,20 +727,20 @@ export default function ETFDashboard() {
               </TooltipProvider>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 md:p-6">
             {!chartReady ? (
-              <div className="h-[500px] flex items-center justify-center text-gray-500">
+              <div className="h-[300px] md:h-[500px] flex items-center justify-center text-gray-500 text-sm md:text-base">
                 Chart data is currently unavailable. This might be due to
                 missing historical price data for key ETFs.
               </div>
             ) : (
               <Tabs defaultValue="percentageChange">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="percentageChange">% Change</TabsTrigger>
-                  <TabsTrigger value="percentageDelta">% Delta</TabsTrigger>
+                <TabsList className="mb-4 w-full md:w-auto grid grid-cols-2 md:flex">
+                  <TabsTrigger value="percentageChange" className="text-xs md:text-sm">% Change</TabsTrigger>
+                  <TabsTrigger value="percentageDelta" className="text-xs md:text-sm">% Delta</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="percentageChange" className="h-[500px]">
+                <TabsContent value="percentageChange" className="h-[300px] md:h-[500px]">
                   <ResponsiveContainer
                     width="100%"
                     height="100%"
@@ -935,7 +935,7 @@ export default function ETFDashboard() {
                   </ResponsiveContainer>
                 </TabsContent>
 
-                <TabsContent value="percentageDelta" className="h-[500px]">
+                <TabsContent value="percentageDelta" className="h-[300px] md:h-[500px]">
                   <ResponsiveContainer
                     width="100%"
                     height="100%"
