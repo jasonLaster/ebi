@@ -3,7 +3,7 @@
  * Shared by the dashboard and its design variants; no React here.
  */
 
-export const SYMBOLS = ["ebi", "iwn", "vtv", "iwv", "vti"] as const;
+export const SYMBOLS = ["ebi", "vti", "voo", "iwv", "iwn", "vtv", "vo"] as const;
 export type Sym = (typeof SYMBOLS)[number];
 
 export interface EtfMeta {
@@ -12,18 +12,79 @@ export interface EtfMeta {
   name: string;
   /** Short role label, e.g. "Benchmark". */
   role: string;
+  /** Plain-language summary of what the fund holds. */
+  description: string;
   color: string;
 }
 
 export const ETFS: Record<Sym, EtfMeta> = {
-  ebi: { symbol: "ebi", ticker: "EBI", name: "Longview Advantage ETF", role: "Focus", color: "#4f46e5" },
-  iwn: { symbol: "iwn", ticker: "IWN", name: "iShares Russell 2000 Value ETF", role: "Small value", color: "#0d9488" },
-  vtv: { symbol: "vtv", ticker: "VTV", name: "Vanguard Value ETF", role: "Large value", color: "#d97706" },
-  iwv: { symbol: "iwv", ticker: "IWV", name: "iShares Russell 3000 ETF", role: "Benchmark", color: "#64748b" },
-  vti: { symbol: "vti", ticker: "VTI", name: "Vanguard Total Stock Market ETF", role: "Total market", color: "#db2777" },
+  ebi: {
+    symbol: "ebi",
+    ticker: "EBI",
+    name: "Longview Advantage ETF",
+    role: "Focus",
+    description: "The fund this dashboard is built around. Holdings come from its latest published portfolio.",
+    color: "#4f46e5",
+  },
+  vti: {
+    symbol: "vti",
+    ticker: "VTI",
+    name: "Vanguard Total Stock Market ETF",
+    role: "Total market",
+    description:
+      "Tracks the CRSP US Total Market Index: nearly every US-listed stock, from mega caps to micro caps, weighted by market value.",
+    color: "#db2777",
+  },
+  voo: {
+    symbol: "voo",
+    ticker: "VOO",
+    name: "Vanguard S&P 500 ETF",
+    role: "S&P 500",
+    description: "Tracks the S&P 500: about 500 of the largest US companies, weighted by market value.",
+    color: "#0284c7",
+  },
+  iwv: {
+    symbol: "iwv",
+    ticker: "IWV",
+    name: "iShares Russell 3000 ETF",
+    role: "Benchmark",
+    description:
+      "Tracks the Russell 3000: the 3,000 largest US stocks, covering almost the entire US market. The approximation's benchmark.",
+    color: "#64748b",
+  },
+  iwn: {
+    symbol: "iwn",
+    ticker: "IWN",
+    name: "iShares Russell 2000 Value ETF",
+    role: "Small value",
+    description:
+      "Tracks the Russell 2000 Value index: small US companies that look cheap on measures like price-to-book.",
+    color: "#0d9488",
+  },
+  vtv: {
+    symbol: "vtv",
+    ticker: "VTV",
+    name: "Vanguard Value ETF",
+    role: "Large value",
+    description:
+      "Tracks the CRSP US Large Cap Value index: large US companies that look cheap on measures like price-to-earnings and price-to-book.",
+    color: "#d97706",
+  },
+  vo: {
+    symbol: "vo",
+    ticker: "VO",
+    name: "Vanguard Mid-Cap ETF",
+    role: "Mid cap",
+    description: "Tracks the CRSP US Mid Cap index: mid-sized US companies, weighted by market value.",
+    color: "#9333ea",
+  },
 };
 
-export const PEERS: Sym[] = ["iwn", "vtv", "iwv", "vti"];
+/** Every comparison ETF, primary ones first. */
+export const PEERS: Sym[] = ["vti", "voo", "iwv", "iwn", "vtv", "vo"];
+/** Shown by default; the rest sit behind "Show more". */
+export const PRIMARY_PEERS: Sym[] = ["vti", "voo"];
+export const isPrimary = (s: Sym) => s === "ebi" || PRIMARY_PEERS.includes(s);
 
 export interface PricePoint {
   date: string;

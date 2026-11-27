@@ -15,8 +15,11 @@ import { updatePeRatios, type EtfPeResult } from "@/src/holdings/update-pe";
 
 export const maxDuration = 300; // seconds
 
-/** Benchmark shown on the dashboard; synced for its P/E only. */
-const BENCHMARK = "IWV";
+/**
+ * Comparison ETFs shown on the dashboard but not used in the approximation;
+ * synced for their holdings (info popovers) and P/E.
+ */
+const COMPARISON_ETFS = ["IWV", "VOO", "VO"];
 /** Alert if less of a fund's weight than this has a usable P/E. */
 const MIN_PE_COVERAGE = 0.7; // IWN sits ~80%: small caps often have negative earnings
 
@@ -107,9 +110,9 @@ export async function GET(request: Request) {
         step = "fetch-baseline-holdings";
         const { outputs } = await measure(
           "sync.fetch-baseline-holdings",
-          { "etf.symbols": [...baselines, BENCHMARK].join(",") },
+          { "etf.symbols": [...baselines, ...COMPARISON_ETFS].join(",") },
           () =>
-            fetchAndStoreManyEtfHoldings([...baselines, BENCHMARK], {
+            fetchAndStoreManyEtfHoldings([...baselines, ...COMPARISON_ETFS], {
               outDir: getBaseDir(),
               db,
             })
@@ -120,7 +123,7 @@ export async function GET(request: Request) {
         step = "pe-ratios";
         try {
           peRatios = await measure("sync.pe-ratios", {}, () =>
-            updatePeRatios(db, [target, ...baselines, BENCHMARK])
+            updatePeRatios(db, [target, ...baselines, ...COMPARISON_ETFS])
           );
           console.log(
             "✅ Weighted P/E:",

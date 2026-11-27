@@ -11,11 +11,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChevronDown } from "lucide-react";
 import {
   ETFS,
   PEERS,
+  PRIMARY_PEERS,
   RANGES,
-  SYMBOLS,
   computeStats,
   cumulativeReturns,
   fmtDate,
@@ -30,24 +31,93 @@ import {
   type Sym,
 } from "@/lib/performance";
 import { SpreadChart, aheadShare } from "@/components/dashboard/spread-chart";
+import { EtfInfo } from "@/components/dashboard/etf-info";
+import { cn } from "@/lib/utils";
 
 const MUTED = "#cbd5e1";
 const EBI = ETFS.ebi;
+const EXTRA_PEERS = PEERS.filter((p) => !PRIMARY_PEERS.includes(p));
 
-function cn(...c: (string | false | undefined)[]) {
-  return c.filter(Boolean).join(" ");
+interface Expand {
+  showAll: boolean;
+  toggle: () => void;
 }
 
-/* ---------------------------------------------------------------- hero */
+/* ------------------------------------------------------------- shared */
 
-function Hero({ data }: { data: PerformanceApiResponse }) {
-  const prices = useMemo(() => priceSeries(data), [data]);
-  const rows = useMemo(() => cumulativeReturns(prices, "ALL"), [prices]);
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      {subtitle && <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">{subtitle}</p>}
+    </div>
+  );
+}
+
+/** One toggle reused in every section; they all share the page-level state. */
+function ShowMore({ showAll, toggle, compact = false }: Expand & { compact?: boolean }) {
+  const label = showAll
+    ? "Show fewer"
+    : compact
+      ? `+${EXTRA_PEERS.length} more`
+      : `Show ${EXTRA_PEERS.length} more (${EXTRA_PEERS.map((p) => ETFS[p].ticker).join(", ")})`;
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-expanded={showAll}
+      className={cn(
+        "inline-flex min-h-0 items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900",
+        compact && "rounded-full border border-dashed border-slate-300 px-2.5 py-1",
+      )}
+    >
+      {label}
+      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showAll && "rotate-180")} aria-hidden />
+    </button>
+  );
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  label: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className="inline-flex self-start rounded-lg bg-slate-100 p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="tab"
+          aria-selected={o.value === value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "min-h-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
+            o.value === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- hero */
+
+function Hero({ data, peers, expand }: { data: PerformanceApiResponse; peers: Sym[]; expand: Expand }) {
+  const rows = useMemo(() => cumulativeReturns(priceSeries(data), "ALL"), [data]);
   const stats = useMemo(() => computeStats(rows, data.peRatios), [rows, data.peRatios]);
-  const ebi = stats.find((s) => s.symbol === "ebi");
-  const peers = stats.filter((s) => s.symbol !== "ebi");
-  const beating = peers.filter((p) => p.ebiSpread > 0).length;
-  const bench = stats.find((s) => s.symbol === "iwv");
+  const bySym = new Map(stats.map((s) => [s.symbol, s]));
+  const ebi = bySym.get("ebi");
+  const allPeers = stats.filter((s) => s.symbol !== "ebi");
+  const beating = allPeers.filter((p) => p.ebiSpread > 0).length;
   const first = rows[0]?.date;
   const last = rows[rows.length - 1]?.date;
 
@@ -56,13 +126,12 @@ function Hero({ data }: { data: PerformanceApiResponse }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
           <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: EBI.color }} />
-          {EBI.ticker} · {EBI.name}
+          <EtfInfo sym="ebi">
+            {EBI.ticker} · {EBI.name}
+          </EtfInfo>
         </div>
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span
-            className="text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl"
-            style={{ color: EBI.color }}
-          >
+          <span className="text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl" style={{ color: EBI.color }}>
             {fmtPct(ebi?.totalReturn)}
           </span>
           <span className="text-sm text-slate-500">
@@ -70,43 +139,53 @@ function Hero({ data }: { data: PerformanceApiResponse }) {
           </span>
         </div>
         <p className="mt-3 text-base text-slate-700 sm:text-lg">
-          Beating <strong className="font-semibold text-slate-900">{beating} of {peers.length}</strong> peers
-          {bench && (
-            <>
-              {" · "}
-              <strong
-                className={cn("font-semibold", bench.ebiSpread >= 0 ? "text-emerald-600" : "text-rose-600")}
-              >
-                {fmtPts(bench.ebiSpread)}
-              </strong>{" "}
-              vs IWV benchmark
-            </>
-          )}
+          {PRIMARY_PEERS.map((p, i) => {
+            const s = bySym.get(p);
+            return (
+              <span key={p}>
+                {i > 0 && " · "}
+                <strong className={cn("font-semibold", (s?.ebiSpread ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                  {fmtPts(s?.ebiSpread)}
+                </strong>{" "}
+                vs {ETFS[p].ticker}
+              </span>
+            );
+          })}
         </p>
-        {last && <p className="mt-1 text-xs text-slate-400">Prices through {fmtDate(last, { month: "short", day: "numeric", year: "numeric" })}</p>}
+        <p className="mt-1 text-sm text-slate-500">
+          Ahead of <strong className="font-semibold text-slate-800">{beating} of {allPeers.length}</strong> tracked ETFs
+          {last && <> · prices through {fmtDate(last, { month: "short", day: "numeric", year: "numeric" })}</>}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 self-center">
-        {peers.map((p) => {
-          const meta = ETFS[p.symbol];
-          const ahead = p.ebiSpread >= 0;
-          return (
-            <div key={p.symbol} className="rounded-xl bg-slate-50 px-4 py-3">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">vs {meta.ticker}</span>
-                <span className="truncate pl-2">{meta.role}</span>
+      <div className="self-center">
+        <div className="grid grid-cols-2 gap-3">
+          {peers.map((p) => {
+            const s = bySym.get(p);
+            const meta = ETFS[p];
+            const primary = PRIMARY_PEERS.includes(p);
+            return (
+              <div key={p} className={cn("rounded-xl px-4 py-3", primary ? "bg-slate-100/80" : "bg-slate-50")}>
+                <div className="whitespace-nowrap text-xs font-semibold text-slate-700">
+                  vs <EtfInfo sym={p} />
+                </div>
+                <div
+                  className={cn(
+                    "mt-1 font-semibold tabular-nums",
+                    primary ? "text-2xl" : "text-lg",
+                    (s?.ebiSpread ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600",
+                  )}
+                >
+                  {fmtPts(s?.ebiSpread)}
+                </div>
+                <div className="truncate text-[11px] text-slate-400">{meta.role}</div>
               </div>
-              <div
-                className={cn(
-                  "mt-1 text-xl font-semibold tabular-nums",
-                  ahead ? "text-emerald-600" : "text-rose-600",
-                )}
-              >
-                {fmtPts(p.ebiSpread)}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div className="mt-3">
+          <ShowMore {...expand} />
+        </div>
       </div>
     </section>
   );
@@ -114,21 +193,24 @@ function Hero({ data }: { data: PerformanceApiResponse }) {
 
 /* --------------------------------------------------------- leaderboard */
 
-function Leaderboard({ data }: { data: PerformanceApiResponse }) {
-  const stats = useMemo(() => {
+function Leaderboard({ data, peers, expand }: { data: PerformanceApiResponse; peers: Sym[]; expand: Expand }) {
+  const ranked = useMemo(() => {
     const rows = cumulativeReturns(priceSeries(data), "ALL");
-    return computeStats(rows, data.peRatios).sort((a, b) => b.totalReturn - a.totalReturn);
+    return computeStats(rows, data.peRatios)
+      .sort((a, b) => b.totalReturn - a.totalReturn)
+      .map((s, i) => ({ ...s, rank: i + 1 }));
   }, [data]);
-  const lo = Math.min(0, ...stats.map((s) => s.totalReturn));
-  const hi = Math.max(0, ...stats.map((s) => s.totalReturn));
+  const visible = ranked.filter((s) => s.symbol === "ebi" || peers.includes(s.symbol));
+  const lo = Math.min(0, ...ranked.map((s) => s.totalReturn));
+  const hi = Math.max(0, ...ranked.map((s) => s.totalReturn));
   const span = hi - lo || 1;
   const zero = ((0 - lo) / span) * 100;
 
   return (
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <SectionTitle title="Leaderboard" subtitle="Total return since inception" />
+      <SectionTitle title="Leaderboard" subtitle={`Total return since inception · rank of ${ranked.length}`} />
       <ol className="mt-4 space-y-2">
-        {stats.map((s, i) => {
+        {visible.map((s) => {
           const meta = ETFS[s.symbol];
           const isEbi = s.symbol === "ebi";
           const left = s.totalReturn >= 0 ? zero : ((s.totalReturn - lo) / span) * 100;
@@ -141,11 +223,12 @@ function Leaderboard({ data }: { data: PerformanceApiResponse }) {
                 isEbi && "bg-indigo-50 ring-1 ring-indigo-100",
               )}
             >
-              <span className="text-xs tabular-nums text-slate-400">{i + 1}</span>
+              <span className="text-xs tabular-nums text-slate-400">{s.rank}</span>
               <span className="min-w-0">
-                <span className={cn("block text-sm font-semibold", isEbi ? "text-indigo-700" : "text-slate-700")}>
-                  {meta.ticker}
-                </span>
+                <EtfInfo
+                  sym={s.symbol}
+                  className={cn("text-sm font-semibold", isEbi ? "text-indigo-700" : "text-slate-700")}
+                />
                 <span className="block truncate text-[11px] text-slate-400">{meta.role}</span>
               </span>
               <div className="relative h-3 min-w-0 rounded-full bg-slate-100">
@@ -160,10 +243,7 @@ function Leaderboard({ data }: { data: PerformanceApiResponse }) {
                 />
               </div>
               <span
-                className={cn(
-                  "text-right text-sm tabular-nums",
-                  isEbi ? "font-semibold text-indigo-700" : "text-slate-600",
-                )}
+                className={cn("text-right text-sm tabular-nums", isEbi ? "font-semibold text-indigo-700" : "text-slate-600")}
               >
                 {fmtPct(s.totalReturn)}
               </span>
@@ -171,6 +251,85 @@ function Leaderboard({ data }: { data: PerformanceApiResponse }) {
           );
         })}
       </ol>
+      <div className="mt-3 px-2">
+        <ShowMore {...expand} />
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------ heat grid */
+
+function cellTint(v: number | undefined, ebi: number | undefined): string {
+  if (v === undefined || ebi === undefined) return "";
+  const d = ebi - v; // >0 → EBI beat this peer
+  const strength = Math.min(Math.abs(d) / 6, 1);
+  const alpha = 0.08 + strength * 0.32;
+  return d >= 0 ? `rgba(16,185,129,${alpha})` : `rgba(244,63,94,${alpha})`;
+}
+
+function PeriodGrid({ data, peers, expand }: { data: PerformanceApiResponse; peers: Sym[]; expand: Expand }) {
+  const periods = useMemo(() => periodReturns(priceSeries(data)), [data]);
+  const order: Sym[] = ["ebi", ...peers];
+
+  return (
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <SectionTitle title="Returns by period" subtitle="Green: EBI beat that ETF over the period · Red: it beat EBI" />
+      <div className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+        <table className="w-full min-w-[19rem] border-separate border-spacing-1 text-xs sm:text-sm">
+          <thead>
+            <tr className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              <th className="text-left font-medium">ETF</th>
+              {RANGES.map((r) => (
+                <th key={r} className={cn("text-right font-medium", r === "1Y" && "hidden sm:table-cell")}>
+                  {r}
+                </th>
+              ))}
+              <th className="pl-2 text-right font-medium">P/E</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.map((s) => {
+              const isEbi = s === "ebi";
+              const pe = data.peRatios?.[s]?.peRatio;
+              return (
+                <tr key={s}>
+                  <td className="py-1.5 pr-1">
+                    <EtfInfo
+                      sym={s}
+                      iconClassName="hidden sm:block"
+                      className={cn("font-semibold", isEbi ? "text-indigo-700" : "text-slate-700")}
+                    />
+                    <div className="hidden text-[11px] text-slate-400 sm:block">{ETFS[s].role}</div>
+                  </td>
+                  {RANGES.map((r) => {
+                    const v = periods[r][s];
+                    return (
+                      <td
+                        key={r}
+                        className={cn(
+                          "rounded-md px-1.5 py-2 text-right tabular-nums sm:px-2.5",
+                          r === "1Y" && "hidden sm:table-cell",
+                          isEbi ? "bg-indigo-50 font-semibold text-indigo-700" : "text-slate-700",
+                        )}
+                        style={isEbi ? undefined : { background: cellTint(v, periods[r].ebi) }}
+                      >
+                        {fmtPct(v)}
+                      </td>
+                    );
+                  })}
+                  <td className="pl-2 text-right tabular-nums text-slate-600">
+                    {typeof pe === "number" ? pe.toFixed(1) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3">
+        <ShowMore {...expand} />
+      </div>
     </section>
   );
 }
@@ -211,11 +370,11 @@ function ChartTooltip({ active, label, payload }: TipProps) {
   );
 }
 
-function niceDomain(rows: ReturnRow[]): { domain: [number, number]; ticks: number[] } {
+function niceDomain(rows: ReturnRow[], syms: Sym[]): { domain: [number, number]; ticks: number[] } {
   let lo = 0;
   let hi = 0;
   for (const r of rows) {
-    for (const s of SYMBOLS) {
+    for (const s of syms) {
       const v = r[s];
       if (v === undefined) continue;
       lo = Math.min(lo, v);
@@ -234,47 +393,24 @@ function niceDomain(rows: ReturnRow[]): { domain: [number, number]; ticks: numbe
 
 type ChartMode = "cumulative" | "relative";
 
-function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-  label: string;
-}) {
-  return (
-    <div role="tablist" aria-label={label} className="inline-flex self-start rounded-lg bg-slate-100 p-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="tab"
-          aria-selected={o.value === value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "min-h-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
-            o.value === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+function chipClass(active: boolean) {
+  return cn(
+    "flex min-h-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+    active ? "border-slate-300 bg-white" : "border-transparent bg-slate-50 text-slate-500",
   );
 }
 
-function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
+function PerformanceChart({ data, peers, expand }: { data: PerformanceApiResponse; peers: Sym[]; expand: Expand }) {
   const [mode, setMode] = useState<ChartMode>("cumulative");
   const [range, setRange] = useState<RangeKey>("ALL");
   const [focus, setFocus] = useState<Sym | null>(null);
-  const [peer, setPeer] = useState<Sym>("iwv");
+  const [chosenPeer, setPeer] = useState<Sym>(PRIMARY_PEERS[0]);
+  // Collapsing "show more" falls back to the first primary peer.
+  const peer = peers.includes(chosenPeer) ? chosenPeer : PRIMARY_PEERS[0];
   const prices = useMemo(() => priceSeries(data), [data]);
   const rows = useMemo(() => cumulativeReturns(prices, range), [prices, range]);
   const spreads = useMemo(() => spreadRows(rows), [rows]);
-  const { domain, ticks } = useMemo(() => niceDomain(rows), [rows]);
+  const { domain, ticks } = useMemo(() => niceDomain(rows, ["ebi", ...peers]), [rows, peers]);
   const last = rows[rows.length - 1];
   const lastSpread = spreads[spreads.length - 1];
   const longRange = range === "ALL" || range === "1Y";
@@ -293,12 +429,7 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
             { value: "relative", label: "Relative to a peer" },
           ]}
         />
-        <Segmented
-          label="Range"
-          value={range}
-          onChange={setRange}
-          options={RANGES.map((r) => ({ value: r, label: r }))}
-        />
+        <Segmented label="Range" value={range} onChange={setRange} options={RANGES.map((r) => ({ value: r, label: r }))} />
       </div>
 
       <div className="mt-5">
@@ -327,9 +458,9 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {mode === "cumulative"
-          ? SYMBOLS.map((s) => {
+          ? (["ebi", ...peers] as Sym[]).map((s) => {
               const isEbi = s === "ebi";
               const active = isEbi || focus === s;
               return (
@@ -339,10 +470,7 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
                   onMouseEnter={() => !isEbi && setFocus(s)}
                   onMouseLeave={() => setFocus(null)}
                   onClick={() => !isEbi && setFocus(focus === s ? null : s)}
-                  className={cn(
-                    "flex min-h-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                    active ? "border-slate-300 bg-white" : "border-transparent bg-slate-50 text-slate-500",
-                  )}
+                  className={chipClass(active)}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: active ? ETFS[s].color : MUTED }} />
                   <span className={isEbi ? "font-semibold text-slate-900" : ""}>{ETFS[s].ticker}</span>
@@ -350,7 +478,7 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
                 </button>
               );
             })
-          : PEERS.map((s) => {
+          : peers.map((s) => {
               const active = s === peer;
               const v = lastSpread?.[s];
               return (
@@ -379,6 +507,7 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
                 </button>
               );
             })}
+        <ShowMore {...expand} compact />
       </div>
 
       <div className="mt-4 h-[280px] sm:h-[380px]">
@@ -409,7 +538,7 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
               />
               <ReferenceLine y={0} stroke="#cbd5e1" />
               <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#e2e8f0" }} />
-              {PEERS.map((s) => (
+              {peers.map((s) => (
                 <Line
                   key={s}
                   dataKey={s}
@@ -444,104 +573,20 @@ function PerformanceChart({ data }: { data: PerformanceApiResponse }) {
   );
 }
 
-/* ------------------------------------------------------------ heat grid */
-
-function cellTint(v: number | undefined, ebi: number | undefined): string {
-  if (v === undefined || ebi === undefined) return "";
-  const d = ebi - v; // >0 → EBI beat this peer
-  const strength = Math.min(Math.abs(d) / 6, 1);
-  const alpha = 0.08 + strength * 0.32;
-  return d >= 0 ? `rgba(16,185,129,${alpha})` : `rgba(244,63,94,${alpha})`;
-}
-
-function PeriodGrid({ data }: { data: PerformanceApiResponse }) {
-  const periods = useMemo(() => periodReturns(priceSeries(data)), [data]);
-  const order: Sym[] = ["ebi", ...PEERS];
-
-  return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <SectionTitle title="Returns by period" subtitle="Green: EBI beat that ETF over the period · Red: it beat EBI" />
-      <div className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0">
-        <table className="w-full min-w-[19rem] border-separate border-spacing-1 text-xs sm:text-sm">
-          <thead>
-            <tr className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-              <th className="text-left font-medium">ETF</th>
-              {RANGES.map((r) => (
-                <th key={r} className={cn("text-right font-medium", r === "1Y" && "hidden sm:table-cell")}>
-                  {r}
-                </th>
-              ))}
-              <th className="pl-2 text-right font-medium">P/E</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.map((s) => {
-              const isEbi = s === "ebi";
-              const pe = data.peRatios?.[s]?.peRatio;
-              return (
-                <tr key={s}>
-                  <td className="py-1.5 pr-1">
-                    <div className={cn("font-semibold", isEbi ? "text-indigo-700" : "text-slate-700")}>
-                      {ETFS[s].ticker}
-                    </div>
-                    <div className="hidden text-[11px] text-slate-400 sm:block">{ETFS[s].role}</div>
-                    <a
-                      href={`/api/holdings/${s}`}
-                      download
-                      className="hidden text-[11px] text-slate-400 underline-offset-2 hover:text-indigo-600 hover:underline sm:inline"
-                    >
-                      Holdings
-                    </a>
-                  </td>
-                  {RANGES.map((r) => {
-                    const v = periods[r][s];
-                    return (
-                      <td
-                        key={r}
-                        className={cn(
-                          "rounded-md px-1.5 py-2 text-right tabular-nums sm:px-2.5",
-                          r === "1Y" && "hidden sm:table-cell",
-                          isEbi ? "bg-indigo-50 font-semibold text-indigo-700" : "text-slate-700",
-                        )}
-                        style={isEbi ? undefined : { background: cellTint(v, periods[r].ebi) }}
-                      >
-                        {fmtPct(v)}
-                      </td>
-                    );
-                  })}
-                  <td className="pl-2 text-right tabular-nums text-slate-600">
-                    {typeof pe === "number" ? pe.toFixed(1) : "—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
 /* --------------------------------------------------------------- shell */
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div>
-      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      {subtitle && <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">{subtitle}</p>}
-    </div>
-  );
-}
-
 export function Scoreboard({ data }: { data: PerformanceApiResponse }) {
+  const [showAll, setShowAll] = useState(false);
+  const expand: Expand = { showAll, toggle: () => setShowAll((v) => !v) };
+  const peers = showAll ? PEERS : PRIMARY_PEERS;
   return (
     <div className="space-y-5 sm:space-y-6">
-      <Hero data={data} />
+      <Hero data={data} peers={peers} expand={expand} />
       <div className="grid gap-5 sm:gap-6 lg:grid-cols-[1fr_1.6fr]">
-        <Leaderboard data={data} />
-        <PeriodGrid data={data} />
+        <Leaderboard data={data} peers={peers} expand={expand} />
+        <PeriodGrid data={data} peers={peers} expand={expand} />
       </div>
-      <PerformanceChart data={data} />
+      <PerformanceChart data={data} peers={peers} expand={expand} />
     </div>
   );
 }

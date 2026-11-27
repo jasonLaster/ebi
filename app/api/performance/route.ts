@@ -160,7 +160,7 @@ export async function GET() {
     );
   }
 
-  const symbolsToCompare = ["EBI", "VTI", "IWV", "IWN", "VTV"];
+  const symbolsToCompare = ["EBI", "VTI", "VOO", "IWV", "IWN", "VTV", "VO"];
   const startDateStr = "2025-03-01";
   const endDateStr = isoDateUTC(new Date()); // yyyy-mm-dd
 
@@ -231,98 +231,46 @@ export async function GET() {
     }
   }
 
-  const resEBI = results.find((r) => r.symbol === "EBI");
-  const resVTI = results.find((r) => r.symbol === "VTI");
-  const resIWV = results.find((r) => r.symbol === "IWV");
-  const resIWN = results.find((r) => r.symbol === "IWN");
-  const resVTV = results.find((r) => r.symbol === "VTV");
-
-  const comparisonDeltas: { [key: string]: string | number } = {};
+  // Deltas of every symbol against the IWV benchmark, keyed like "ebi_iwv".
   const benchmarkSymbol = "IWV";
-  const symbolsForDelta = ["EBI", "IWN", "VTV", "VTI"];
-
   const benchmarkResult = results.find((r) => r.symbol === benchmarkSymbol);
-
-  if (benchmarkResult && benchmarkResult.performance !== undefined) {
-    for (const sym of symbolsForDelta) {
-      const symResult = results.find((r) => r.symbol === sym);
-      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
-
-      if (symResult && symResult.performance !== undefined) {
-        comparisonDeltas[deltaKey] = parseFloat(
-          (symResult.performance - benchmarkResult.performance).toFixed(2)
-        );
-      } else {
-        comparisonDeltas[deltaKey] =
-          `N/A (missing performance for ${sym} or ${benchmarkSymbol})`;
-      }
-    }
-  } else {
-    // If benchmark (IWV) data is missing, all deltas against it are N/A
-    for (const sym of symbolsForDelta) {
-      const deltaKey = `${sym.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
-      comparisonDeltas[deltaKey] =
-        `N/A (missing performance for ${benchmarkSymbol})`;
-    }
+  const comparisonDeltas: { [key: string]: string | number } = {};
+  for (const r of results) {
+    if (r.symbol === benchmarkSymbol) continue;
+    const deltaKey = `${r.symbol.toLowerCase()}_${benchmarkSymbol.toLowerCase()}`;
+    comparisonDeltas[deltaKey] =
+      r.performance !== undefined && benchmarkResult?.performance !== undefined
+        ? parseFloat((r.performance - benchmarkResult.performance).toFixed(2))
+        : `N/A (missing performance for ${r.symbol} or ${benchmarkSymbol})`;
   }
+
+  const individualPerformance = Object.fromEntries(
+    results.map((r) => [
+      r.symbol.toLowerCase(),
+      r.error
+        ? { error: r.error }
+        : {
+            startDate: r.startDate,
+            startPrice: r.startPrice,
+            endDate: r.endDate,
+            endPrice: r.endPrice,
+            performance: r.performance?.toFixed(2) + "%",
+          },
+    ])
+  );
 
   const finalJsonOutput = {
     dateRange: {
       startDate: startDateStr,
       endDate: endDateStr,
     },
-    individualPerformance: {
-      ebi: resEBI?.error
-        ? { error: resEBI.error }
-        : {
-            startDate: resEBI?.startDate,
-            startPrice: resEBI?.startPrice,
-            endDate: resEBI?.endDate,
-            endPrice: resEBI?.endPrice,
-            performance: resEBI?.performance?.toFixed(2) + "%",
-          },
-      vti: resVTI?.error
-        ? { error: resVTI.error }
-        : {
-            startDate: resVTI?.startDate,
-            startPrice: resVTI?.startPrice,
-            endDate: resVTI?.endDate,
-            endPrice: resVTI?.endPrice,
-            performance: resVTI?.performance?.toFixed(2) + "%",
-          },
-      iwv: resIWV?.error
-        ? { error: resIWV.error }
-        : {
-            startDate: resIWV?.startDate,
-            startPrice: resIWV?.startPrice,
-            endDate: resIWV?.endDate,
-            endPrice: resIWV?.endPrice,
-            performance: resIWV?.performance?.toFixed(2) + "%",
-          },
-      iwn: resIWN?.error
-        ? { error: resIWN.error }
-        : {
-            startDate: resIWN?.startDate,
-            startPrice: resIWN?.startPrice,
-            endDate: resIWN?.endDate,
-            endPrice: resIWN?.endPrice,
-            performance: resIWN?.performance?.toFixed(2) + "%",
-          },
-      vtv: resVTV?.error
-        ? { error: resVTV.error }
-        : {
-            startDate: resVTV?.startDate,
-            startPrice: resVTV?.startPrice,
-            endDate: resVTV?.endDate,
-            endPrice: resVTV?.endPrice,
-            performance: resVTV?.performance?.toFixed(2) + "%",
-          },
-    },
+    individualPerformance,
     performanceDeltas: comparisonDeltas,
     historicalPrices: allHistoricalData,
     deltaNote:
       "Positive delta means the first symbol performed better than the second by that percentage point difference.",
   };
+
 
   const failedSymbols = results.filter((r) => r.error).map((r) => r.symbol);
   if (failedSymbols.length > 0) {

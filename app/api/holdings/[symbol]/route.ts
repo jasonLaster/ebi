@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { getLatestHoldingsData, openHoldingsDb } from "@/src/lib/db";
+import { summarizeHoldings } from "@/src/holdings/summary";
 
-/** Latest synced holdings for one ETF, as a JSON download. */
+const CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
+
+/**
+ * Latest synced holdings for one ETF, as a JSON download.
+ * `?top=N` instead returns a compact summary (count + N largest positions).
+ */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ symbol: string }> }
 ) {
   const { symbol } = await params;
@@ -20,10 +26,17 @@ export async function GET(
         { status: 404 }
       );
     }
+    const top = new URL(request.url).searchParams.get("top");
+    if (top !== null) {
+      const n = Math.min(Math.max(Number.parseInt(top, 10) || 10, 1), 50);
+      return NextResponse.json(summarizeHoldings(data, n), {
+        headers: { "Cache-Control": CACHE_CONTROL },
+      });
+    }
     return NextResponse.json(data, {
       headers: {
         "Content-Disposition": `attachment; filename="${symbol.toLowerCase()}_holdings_${data.date}.json"`,
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        "Cache-Control": CACHE_CONTROL,
       },
     });
   } finally {

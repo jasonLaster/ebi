@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { SpreadChart, aheadShare } from "@/components/dashboard/spread-chart";
+import { EtfInfo } from "@/components/dashboard/etf-info";
 import {
   ETFS,
   RANGES,
@@ -181,7 +182,7 @@ function BlendHero({
           {parts.map((p) => (
             <li key={p.s} className="flex items-center gap-1.5">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: ETFS[p.s].color }} />
-              <span className="font-semibold text-slate-700">{ETFS[p.s].ticker}</span>
+              <EtfInfo sym={p.s} className="font-semibold text-slate-700" />
               <span className="truncate">{ETFS[p.s].role}</span>
             </li>
           ))}
