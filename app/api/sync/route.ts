@@ -11,8 +11,14 @@ import { openHoldingsDb, storeHoldingsData } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
 import { notifyIssue } from "@/src/lib/notify";
 import { measure } from "@/src/lib/trace";
+import { updatePeRatios, type EtfPeResult } from "@/src/holdings/update-pe";
 
 export const maxDuration = 300; // seconds
+
+/** Benchmark shown on the dashboard; synced for its P/E only. */
+const BENCHMARK = "IWV";
+/** Alert if less of a fund's weight than this has a usable P/E. */
+const MIN_PE_COVERAGE = 0.7; // IWN sits ~80%: small caps often have negative earnings
 
 /** Alert (without failing) if the published holdings are older than this. */
 const STALE_AFTER_DAYS = 5;
@@ -70,6 +76,7 @@ export async function GET(request: Request) {
       let ebiAsOfDate: string | null = null;
       let ebiHoldingsCount: number | undefined;
       let ebiSource: string | undefined;
+      let peRatios: EtfPeResult[] | undefined;
 
       if (!testMode) {
         step = "fetch-ebi-holdings";
@@ -100,14 +107,41 @@ export async function GET(request: Request) {
         step = "fetch-baseline-holdings";
         const { outputs } = await measure(
           "sync.fetch-baseline-holdings",
-          { "etf.symbols": baselines.join(",") },
+          { "etf.symbols": [...baselines, BENCHMARK].join(",") },
           () =>
-            fetchAndStoreManyEtfHoldings(baselines, {
+            fetchAndStoreManyEtfHoldings([...baselines, BENCHMARK], {
               outDir: getBaseDir(),
               db,
             })
         );
         for (const o of outputs) console.log(`✅ ${o.symbol} → ${o.jsonPath}`);
+
+        // P/E is informational: a failure here alerts but doesn't fail the sync.
+        step = "pe-ratios";
+        try {
+          peRatios = await measure("sync.pe-ratios", {}, () =>
+            updatePeRatios(db, [target, ...baselines, BENCHMARK])
+          );
+          console.log(
+            "✅ Weighted P/E:",
+            peRatios.map((r) => `${r.symbol}=${r.weightedPe?.toFixed(1) ?? "n/a"} (${(r.coverage * 100).toFixed(0)}%)`).join(" ")
+          );
+          const lowCoverage = peRatios.filter((r) => r.coverage < MIN_PE_COVERAGE);
+          if (lowCoverage.length > 0) {
+            await notifyIssue({
+              subject: "Low P/E coverage for some ETFs",
+              context: {
+                etfs: lowCoverage
+                  .map((r) => `${r.symbol}: ${(r.coverage * 100).toFixed(0)}%`)
+                  .join(", "),
+                threshold: `${MIN_PE_COVERAGE * 100}%`,
+              },
+            });
+          }
+        } catch (error) {
+          console.error("⚠️ P/E update failed:", error);
+          await notifyIssue({ subject: "P/E ratio update failed", error });
+        }
 
         if (!ebiAsOfDate || daysSince(ebiAsOfDate) > STALE_AFTER_DAYS) {
           await notifyIssue({
@@ -155,6 +189,7 @@ export async function GET(request: Request) {
         ebiAsOfDate,
         ebiHoldingsCount,
         ebiSource,
+        peRatios,
         timestamp: results.timestamp,
         targetEtf: results.targetEtf,
         baselineEtfs: results.baselineEtfs,

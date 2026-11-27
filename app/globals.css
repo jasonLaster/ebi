@@ -12,6 +12,46 @@ body {
   }
 }
 
+/* Mobile-friendly improvements */
+@layer base {
+  /* Prevent horizontal scroll on mobile */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  /* Smoother touch scrolling */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Better touch targets on mobile */
+  @media (max-width: 640px) {
+    button, 
+    [role="button"],
+    input,
+    select,
+    textarea {
+      min-height: 44px;
+    }
+    
+    /* Improve table readability on mobile */
+    table {
+      font-size: 0.875rem;
+    }
+    
+    /* Recharts tooltip mobile optimization */
+    .recharts-tooltip-wrapper {
+      font-size: 0.75rem !important;
+    }
+    
+    /* Recharts legend mobile optimization */
+    .recharts-legend-wrapper {
+      font-size: 0.75rem !important;
+    }
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

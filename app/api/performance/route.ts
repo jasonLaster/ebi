@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { openHoldingsDb, getPerformanceCache, setPerformanceCache } from "@/src/lib/db";
+import {
+  openHoldingsDb,
+  getLatestPeRatios,
+  getPerformanceCache,
+  setPerformanceCache,
+} from "@/src/lib/db";
 import { notifyIssue } from "@/src/lib/notify";
 import { measure } from "@/src/lib/trace";
 
@@ -162,8 +167,16 @@ export async function GET() {
   // Generate cache key based on start date and symbols
   const cacheKey = `performance_${startDateStr}_${symbolsToCompare.sort().join(",")}`;
 
-  // Try to get from cache
   const db = await openHoldingsDb();
+
+  // Weighted P/E comes from the latest synced holdings, read on every request
+  // so a 24h-cached price payload never shows stale P/E.
+  const peRatios = await getLatestPeRatios(db, symbolsToCompare).catch((error) => {
+    console.warn("[EBI API] Error reading P/E ratios:", error);
+    return {};
+  });
+
+  // Try to get from cache
   try {
     const cached = await getPerformanceCache(db, cacheKey);
     if (cached) {
@@ -172,7 +185,7 @@ export async function GET() {
       // Update the endDate in the cached response to reflect current date
       cachedData.dateRange.endDate = endDateStr;
       db.close();
-      return NextResponse.json(cachedData);
+      return NextResponse.json({ ...cachedData, peRatios });
     }
   } catch (error) {
     console.warn("[EBI API] Error reading cache, proceeding with fresh fetch:", error);
@@ -325,7 +338,7 @@ export async function GET() {
     });
     // Don't cache partial results for 24h; retry on the next request.
     db.close();
-    return NextResponse.json(finalJsonOutput);
+    return NextResponse.json({ ...finalJsonOutput, peRatios });
   }
 
   // Store in cache
@@ -340,5 +353,5 @@ export async function GET() {
   }
 
   console.log("[EBI API] Returning JSON result");
-  return NextResponse.json(finalJsonOutput);
+  return NextResponse.json({ ...finalJsonOutput, peRatios });
 }

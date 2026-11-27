@@ -113,9 +113,9 @@ export function PortfolioApproximation() {
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Portfolio Approximation</CardTitle>
-          <CardDescription>Loading optimization results...</CardDescription>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Portfolio Approximation</CardTitle>
+          <CardDescription className="text-sm">Loading optimization results...</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -124,14 +124,14 @@ export function PortfolioApproximation() {
   if (error || !data) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Portfolio Approximation</CardTitle>
-          <CardDescription className="text-red-500">
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl">Portfolio Approximation</CardTitle>
+          <CardDescription className="text-red-500 text-sm">
             {error || "No data available"}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600">
+        <CardContent className="p-4 md:p-6">
+          <p className="text-xs md:text-sm text-gray-600">
             Run the approximation script to generate results.
           </p>
         </CardContent>
@@ -186,11 +186,11 @@ export function PortfolioApproximation() {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle>Portfolio Approximation Results</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-lg md:text-xl">Portfolio Approximation Results</CardTitle>
+            <CardDescription className="text-sm">
               Optimal weights to approximate EBI holdings using VTI, VTV, and
               IWN
               <br />
@@ -204,6 +204,7 @@ export function PortfolioApproximation() {
             disabled={refreshing}
             variant="outline"
             size="sm"
+            className="w-full sm:w-auto"
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
@@ -212,21 +213,21 @@ export function PortfolioApproximation() {
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 md:space-y-6 p-4 md:p-6">
         {/* Optimal Weights */}
         <div>
-          <h3 className="text-lg font-semibold mb-3">Optimal Weights</h3>
+          <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">Optimal Weights</h3>
           <div className="space-y-3">
             {etfData.map((etf) => (
               <div key={etf.symbol} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="font-medium">{etf.symbol}</span>
-                    <span className="text-sm text-gray-500 ml-2">
+                <div className="flex justify-between items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-sm md:text-base">{etf.symbol}</span>
+                    <span className="text-xs md:text-sm text-gray-500 ml-2 hidden sm:inline">
                       {etf.name}
                     </span>
                   </div>
-                  <span className="font-semibold">
+                  <span className="font-semibold text-sm md:text-base flex-shrink-0">
                     {etf.weight.toFixed(2)}%
                   </span>
                 </div>
@@ -247,23 +248,23 @@ export function PortfolioApproximation() {
         {/* Enhanced Analysis */}
         {data.analysis && (
           <div>
-            <h3 className="text-lg font-semibold mb-3">Analysis</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">Analysis</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Tracking Error:</span>
-                  <span className="font-medium">
+                  <span className="text-xs md:text-sm text-gray-600">Tracking Error:</span>
+                  <span className="font-medium text-sm md:text-base">
                     {(data.analysis.trackingError * 100).toFixed(4)}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Error Rate:</span>
-                  <span className="font-medium">
+                  <span className="text-xs md:text-sm text-gray-600">Error Rate:</span>
+                  <span className="font-medium text-sm md:text-base">
                     {data.analysis.errorRate.toFixed(2)}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Confidence:</span>
+                  <span className="text-xs md:text-sm text-gray-600">Confidence:</span>
                   <Badge
                     className={getConfidenceColor(data.analysis.confidence)}
                   >
@@ -272,23 +273,23 @@ export function PortfolioApproximation() {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Improvement:</span>
-                  <span className="font-medium text-green-600 flex items-center">
-                    <TrendingUp className="h-4 w-4 mr-1" />+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-gray-600">Improvement:</span>
+                  <span className="font-medium text-green-600 flex items-center text-sm md:text-base">
+                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4 mr-1" />+
                     {data.optimizationMetrics.improvementPercent.toFixed(2)}%
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Avg Error:</span>
-                  <span className="font-medium">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-gray-600">Avg Error:</span>
+                  <span className="font-medium text-sm md:text-base">
                     {(data.optimizationMetrics.averageError * 100).toFixed(4)}%
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Max Error:</span>
-                  <span className="font-medium text-red-600 flex items-center">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-gray-600">Max Error:</span>
+                  <span className="font-medium text-red-600 flex items-center text-sm md:text-base">
+                    <AlertTriangle className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     {(data.optimizationMetrics.maxError * 100).toFixed(4)}%
                   </span>
                 </div>
@@ -299,27 +300,27 @@ export function PortfolioApproximation() {
 
         {/* Optimization Metrics */}
         <div>
-          <h3 className="text-lg font-semibold mb-3">Optimization Metrics</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">Optimization Metrics</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Final Error:</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-xs md:text-sm text-gray-600">Final Error:</span>
+                <span className="font-medium text-sm md:text-base">
                   {data.optimizationMetrics.finalObjectiveValue.toFixed(6)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Stocks w/ Error:</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-xs md:text-sm text-gray-600">Stocks w/ Error:</span>
+                <span className="font-medium text-sm md:text-base">
                   {data.optimizationMetrics.errorCount}/
                   {data.optimizationMetrics.totalStocks}
                 </span>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Total Stocks:</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-xs md:text-sm text-gray-600">Total Stocks:</span>
+                <span className="font-medium text-sm md:text-base">
                   {data.optimizationMetrics.totalStocks.toLocaleString()}
                 </span>
               </div>
@@ -329,10 +330,10 @@ export function PortfolioApproximation() {
 
         {/* Constraints Validation */}
         <div>
-          <h3 className="text-lg font-semibold mb-3">Constraints Validation</h3>
+          <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">Constraints Validation</h3>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs md:text-sm text-gray-600">
                 Weights sum to 100%:
               </span>
               <Badge
@@ -342,30 +343,33 @@ export function PortfolioApproximation() {
                     ? "default"
                     : "destructive"
                 }
+                className="text-xs"
               >
                 {data.constraints.weightsSum.toFixed(6)}
               </Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">All weights ≥ 0:</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs md:text-sm text-gray-600">All weights ≥ 0:</span>
               <Badge
                 variant={
                   data.constraints.allWeightsNonNegative
                     ? "default"
                     : "destructive"
                 }
+                className="text-xs"
               >
                 {data.constraints.allWeightsNonNegative ? "✓" : "✗"}
               </Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">All weights ≤ 100%:</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs md:text-sm text-gray-600">All weights ≤ 100%:</span>
               <Badge
                 variant={
                   data.constraints.allWeightsLessThanOne
                     ? "default"
                     : "destructive"
                 }
+                className="text-xs"
               >
                 {data.constraints.allWeightsLessThanOne ? "✓" : "✗"}
               </Badge>
@@ -374,9 +378,9 @@ export function PortfolioApproximation() {
         </div>
 
         {/* Summary */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-semibold mb-2">Summary</h4>
-          <p className="text-sm text-gray-600">
+        <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+          <h4 className="font-semibold mb-2 text-sm md:text-base">Summary</h4>
+          <p className="text-xs md:text-sm text-gray-600">
             The optimization algorithm found that EBI holdings can be best
             approximated using
             <strong> {data.weightsPercentages.vti.toFixed(1)}% VTI</strong>,
@@ -384,7 +388,7 @@ export function PortfolioApproximation() {
             <strong> {data.weightsPercentages.iwn.toFixed(1)}% IWN</strong>.
             This combination achieves a{" "}
             {data.optimizationMetrics.improvementPercent.toFixed(1)}%
-            improvement over the initial guess with an average error of
+            improvement over the initial guess with an average error of{" "}
             {(data.optimizationMetrics.averageError * 100).toFixed(4)}%.
             {data.analysis && (
               <>

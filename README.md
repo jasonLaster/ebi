@@ -1,6 +1,6 @@
 # EBI Portfolio Approximation Dashboard
 
-This project analyzes the iShares ESG Aware MSCI EM ETF (EBI) and provides portfolio approximation using optimization algorithms to find optimal weights for VTI, VTV, and IWN ETFs that best replicate EBI's holdings.
+This project analyzes the Longview Advantage ETF (EBI) and provides portfolio approximation using optimization algorithms to find optimal weights for VTI, VTV, and IWN ETFs that best replicate EBI's holdings.
 
 ## 🎯 Project Overview
 
@@ -241,6 +241,7 @@ Where:
 - **Daily sync**: Vercel Cron calls `GET /api/sync` at 05:00 UTC. Full syncs require `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends it automatically); `?test=true` runs the read-only approximation and is used as the post-deploy smoke test.
 - **Issue emails**: `src/lib/notify.ts` emails `ALERT_EMAIL_TO` through Resend when a sync fails, the published holdings are stale (> 5 days), FMP price fetches fail, the approximation fails, or Next.js captures an unhandled server error (`onRequestError` in `instrumentation.ts`). Without `RESEND_API_KEY`/`ALERT_EMAIL_TO` it just logs.
 - **Tracing**: `instrumentation.ts` registers `@vercel/otel`; sync steps, FMP fetches, and the optimizer run in custom spans (`src/lib/trace.ts`). Inspect with `vercel traces search --project ebi`.
+- **P/E**: each sync fetches every holding's trailing P/E for EBI, VTI, VTV, IWN, and IWV through FMP's batch quote endpoint (about 5 requests), then stores each fund's weighted harmonic P/E (portfolio price ÷ portfolio earnings). Low coverage or failures send an email but don't fail the sync. Per-ETF holdings, including P/E, can be downloaded from `GET /api/holdings/:symbol`.
 - **Metrics**: `sync.run` (by `mode`/`outcome`), `sync.duration_ms`, and `sync.ebi_holdings` via `metric()` from `@vercel/functions`.
 
 ### Technologies Used

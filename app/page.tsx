@@ -66,6 +66,8 @@ interface ApiResponse {
   };
   individualPerformance: IndividualPerformance;
   performanceDeltas: Record<string, number | string>; // Deltas can be numbers or "N/A"
+  /** Weighted P/E from the latest synced holdings, keyed by lowercase symbol. */
+  peRatios?: Record<string, { peRatio: number | null; date: string } | null>;
   historicalPrices: HistoricalPrices;
   deltaNote: string;
 }
@@ -143,6 +145,37 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   }
   return null;
 };
+
+function PeCell({
+  pe,
+}: {
+  pe: { peRatio: number | null; date: string } | null | undefined;
+}) {
+  if (!pe || pe.peRatio === null) {
+    return <span className="text-gray-400">N/A</span>;
+  }
+  return (
+    <span title={`Weighted harmonic P/E of holdings as of ${pe.date}`}>
+      {pe.peRatio.toFixed(1)}
+    </span>
+  );
+}
+
+function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
+  return (
+    <>
+      <div className="font-bold">{symbol}</div>
+      <div className="text-xs text-gray-500 sm:hidden">{name}</div>
+      <a
+        href={`/api/holdings/${symbol.toLowerCase()}`}
+        className="text-xs font-normal text-blue-600 hover:underline"
+        download
+      >
+        Holdings JSON
+      </a>
+    </>
+  );
+}
 
 export default function ETFDashboard() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
@@ -453,10 +486,10 @@ export default function ETFDashboard() {
   const symbolDisplayData = [
     {
       symbol: "EBI",
-      name: "iShares ESG Aware MSCI EM ETF",
+      name: "Longview Advantage ETF",
       perfData: ebiPerfData,
       deltaKey: "ebi_iwv",
-      description: "iShares ESG Aware MSCI EM ETF",
+      description: "Longview Advantage ETF",
     },
     {
       symbol: "IWN",
@@ -490,15 +523,15 @@ export default function ETFDashboard() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">ETF Performance Dashboard</h1>
-      <p className="text-gray-500 mb-8">
+    <div className="container mx-auto px-4 py-4 md:px-6 md:py-8">
+      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 md:mb-6">ETF Performance Dashboard</h1>
+      <p className="text-gray-500 mb-4 md:mb-8 text-sm md:text-base">
         {formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}
       </p>
 
       {/* Performance Summary Table - REPLACES THE CARDS */}
-      <div className="mb-8 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
+      <div className="mb-4 md:mb-8 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg text-sm md:text-base">
           <thead className="bg-gray-50">
             <tr>
               <th
@@ -525,16 +558,19 @@ export default function ETFDashboard() {
               >
                 Delta vs IWV
               </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                P/E
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {symbolDisplayData.slice(0, 3).map((item) => (
               <tr key={item.symbol} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
-                  <div className="font-bold">{item.symbol}</div>
-                  <div className="text-xs text-gray-500 sm:hidden">
-                    {item.name}
-                  </div>
+                  <SymbolCell symbol={item.symbol} name={item.name} />
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
                   {item.description}
@@ -586,13 +622,19 @@ export default function ETFDashboard() {
                     <span className="text-gray-400">N/A</span>
                   )}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <PeCell pe={apiData.peRatios?.[item.symbol.toLowerCase()]} />
+                </td>
               </tr>
             ))}
 
             {/* Separator Row for IWV (Baseline) */}
             <tr className="bg-gray-50">
               <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800 sm:px-6">
-                {benchmarkSymbolData.symbol}
+                <SymbolCell
+                  symbol={benchmarkSymbolData.symbol}
+                  name={benchmarkSymbolData.name}
+                />
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell sm:px-6">
                 {benchmarkSymbolData.description}
@@ -629,16 +671,16 @@ export default function ETFDashboard() {
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 sm:px-6">
                 Baseline
               </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm sm:px-6">
+                <PeCell pe={apiData.peRatios?.iwv} />
+              </td>
             </tr>
 
             {/* VTI Row (after separator) */}
             {symbolDisplayData.slice(3).map((item) => (
               <tr key={item.symbol} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
-                  <div className="font-bold">{item.symbol}</div>
-                  <div className="text-xs text-gray-500 sm:hidden">
-                    {item.name}
-                  </div>
+                  <SymbolCell symbol={item.symbol} name={item.name} />
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
                   {item.description}
@@ -690,6 +732,9 @@ export default function ETFDashboard() {
                     <span className="text-gray-400">N/A</span>
                   )}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <PeCell pe={apiData.peRatios?.[item.symbol.toLowerCase()]} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -697,28 +742,28 @@ export default function ETFDashboard() {
       </div>
 
       {/* Portfolio Approximation Section */}
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <PortfolioApproximation />
       </div>
 
       {/* Portfolio Comparison Section */}
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <PortfolioComparison />
       </div>
 
       {/* Charts Section */}
-      <div className="space-y-8">
+      <div className="space-y-4 md:space-y-8">
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Performance Chart</CardTitle>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-lg md:text-xl">Performance Chart</CardTitle>
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <InfoIcon className="h-4 w-4 text-gray-400" />
+                    <InfoIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-xs">
+                    <p className="max-w-xs text-sm">
                       Normalized percentage change from start date (top chart).
                       Delta percentage change against IWV (bottom chart).
                     </p>
@@ -727,20 +772,20 @@ export default function ETFDashboard() {
               </TooltipProvider>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 md:p-6">
             {!chartReady ? (
-              <div className="h-[500px] flex items-center justify-center text-gray-500">
+              <div className="h-[300px] md:h-[500px] flex items-center justify-center text-gray-500 text-sm md:text-base">
                 Chart data is currently unavailable. This might be due to
                 missing historical price data for key ETFs.
               </div>
             ) : (
               <Tabs defaultValue="percentageChange">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="percentageChange">% Change</TabsTrigger>
-                  <TabsTrigger value="percentageDelta">% Delta</TabsTrigger>
+                <TabsList className="mb-4 w-full md:w-auto grid grid-cols-2 md:flex">
+                  <TabsTrigger value="percentageChange" className="text-xs md:text-sm">% Change</TabsTrigger>
+                  <TabsTrigger value="percentageDelta" className="text-xs md:text-sm">% Delta</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="percentageChange" className="h-[500px]">
+                <TabsContent value="percentageChange" className="h-[300px] md:h-[500px]">
                   <ResponsiveContainer
                     width="100%"
                     height="100%"
@@ -935,7 +980,7 @@ export default function ETFDashboard() {
                   </ResponsiveContainer>
                 </TabsContent>
 
-                <TabsContent value="percentageDelta" className="h-[500px]">
+                <TabsContent value="percentageDelta" className="h-[300px] md:h-[500px]">
                   <ResponsiveContainer
                     width="100%"
                     height="100%"
