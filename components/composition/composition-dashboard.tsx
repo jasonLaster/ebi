@@ -25,6 +25,7 @@ import {
   type RangeKey,
 } from "@/lib/performance";
 import { usePerformance } from "@/lib/use-performance";
+import { cn } from "@/lib/utils";
 
 const BLEND = ["vti", "iwn", "vtv"] as const;
 type BlendSym = (typeof BLEND)[number];
@@ -44,10 +45,6 @@ interface Approximation {
   };
   constraints: { weightsSum: number; allWeightsNonNegative: boolean; allWeightsLessThanOne: boolean };
   analysis?: { trackingError: number; errorRate: number; confidence: string };
-}
-
-function cn(...c: (string | false | undefined)[]) {
-  return c.filter(Boolean).join(" ");
 }
 
 async function fetchApproximation(method: "GET" | "POST"): Promise<Approximation> {
