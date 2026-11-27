@@ -41,8 +41,8 @@ async function main() {
       
       // Get some sample symbols with their weights
       const sampleEntries = Array.from(weightMap.entries())
-        .filter(([_, w]) => w > 0)
-        .sort(([_, a], [__, b]) => b - a)
+        .filter((entry) => entry[1] > 0)
+        .sort((x, y) => y[1] - x[1])
         .slice(0, 5);
       console.log(`  Top 5 holdings: ${sampleEntries.map(([sym, w]) => `${sym}: ${(w * 100).toFixed(2)}%`).join(', ')}`);
       

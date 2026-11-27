@@ -1,8 +1,4 @@
-import {
-  HoldingsDb,
-  getHoldingsWeightMap,
-  getAllUniqueSymbols,
-} from "@/src/lib/db";
+import { HoldingsDb, getHoldingsWeightMap } from "@/src/lib/db";
 import { Alglib } from "./alglib.js";
 
 export interface OptimizationMetrics {
@@ -111,20 +107,7 @@ export async function runApproximation(
   for (const map of baselineMaps) {
     for (const sym of map.keys()) relevantSymbols.add(sym);
   }
-  let symbols = Array.from(relevantSymbols).sort();
-
-  // Filter out test symbols (AAA, BBB) as a safety measure
-  const TEST_SYMBOLS = new Set(["AAA", "BBB"]);
-  const symbolsBeforeFilter = symbols.length;
-  symbols = symbols.filter((sym) => !TEST_SYMBOLS.has(sym.toUpperCase()));
-  
-  // Warn if test symbols were found and filtered
-  const filteredCount = symbolsBeforeFilter - symbols.length;
-  if (filteredCount > 0) {
-    console.warn(
-      `⚠️  Warning: Filtered out ${filteredCount} test symbol(s) (AAA, BBB) from optimization`
-    );
-  }
+  const symbols = Array.from(relevantSymbols).sort();
 
   // Build vectors/matrix.
   const H_target_raw = symbols.map((sym) => targetMap.get(sym) ?? 0);

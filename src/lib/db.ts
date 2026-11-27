@@ -128,7 +128,12 @@ export async function upsertHoldingsForEtf(
     ],
   }));
 
-  await db.batch(statements, "write");
+  // Replace the ETF's holdings in one transaction so positions the fund has
+  // exited don't linger (an upsert alone never removes them).
+  await db.batch(
+    [{ sql: `DELETE FROM holdings WHERE etf_id = ?`, args: [etfId] }, ...statements],
+    "write"
+  );
 }
 
 export async function storeHoldingsData(

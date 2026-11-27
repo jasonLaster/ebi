@@ -7,6 +7,8 @@ import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
 import { openHoldingsDb } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
 import { downloadHoldingsPdf } from "./download-holdings-pdf";
+import { fetchEbiHoldings, EBI_FUND_DATA_URL } from "@/src/holdings/fetch-ebi";
+import { writeHoldingsOutputs } from "@/src/holdings/storage";
 
 function resolvePath(p: string): string {
   return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
@@ -27,7 +29,7 @@ async function main(): Promise<void> {
     )
     .argument(
       "[pdf]",
-      "Path to EBI holdings PDF (if not provided, downloads latest)"
+      "Path to an EBI holdings PDF (default: fetch the live holdings table from the fund page)"
     )
     .option("-o, --out-dir <dir>", "Output directory", "data")
     .option("--target <symbol>", "Target ETF symbol", "EBI")
@@ -45,11 +47,7 @@ async function main(): Promise<void> {
     .option("--no-analyze", "Skip PDF holdings analysis output")
     .option(
       "--download",
-      "Force download latest PDF (ignores provided PDF path)"
-    )
-    .option(
-      "--no-download",
-      "Skip download, use existing PDF (requires PDF path)"
+      "Download the PDF via Hyperbrowser instead of fetching the HTML table"
     )
     .parse(process.argv);
 
@@ -61,24 +59,17 @@ async function main(): Promise<void> {
     apiKey?: string;
     analyze: boolean;
     download?: boolean;
-    noDownload?: boolean;
   }>();
 
   const [pdfArg] = program.args as [string?];
 
-  // Determine if we should download the PDF
-  const shouldDownload = opts.download || (!pdfArg && !opts.noDownload);
-
-  let pdfPath: string;
-
-  if (shouldDownload) {
-    // Download the latest PDF
-    console.log("📥 Downloading latest PDF from Longview Research Partners...");
+  let pdfPath: string | null = null;
+  if (opts.download) {
+    console.log("📥 Downloading latest PDF via Hyperbrowser...");
     pdfPath = await downloadHoldingsPdf();
     console.log(`✅ Downloaded: ${pdfPath}\n`);
-  } else {
-    // Use provided PDF or default
-    pdfPath = resolvePath(pdfArg ?? "data/holdings.pdf");
+  } else if (pdfArg) {
+    pdfPath = resolvePath(pdfArg);
     if (!fs.existsSync(pdfPath)) {
       throw new Error(`PDF file not found: ${pdfPath}`);
     }
@@ -98,7 +89,7 @@ async function main(): Promise<void> {
 
   console.log("🔄 Syncing holdings + approximation");
   console.log("==================================");
-  console.log(`PDF:      ${pdfPath}`);
+  console.log(`Source:   ${pdfPath ?? EBI_FUND_DATA_URL}`);
   console.log(`Out dir:  ${outDir}`);
   console.log(`Target:   ${target}`);
   console.log(`Baseline: ${baselines.join(",")}`);
@@ -107,13 +98,22 @@ async function main(): Promise<void> {
   // Open database connection once for all operations
   const db = await openHoldingsDb();
   try {
-    // Step 1: Parse EBI PDF -> JSON + Turso
+    // Step 1: EBI holdings (HTML table or PDF) -> JSON + Turso
     const ebiJsonPath = path.join(outDir, "ebi_holdings.json");
-    console.log(`Step 1/3: Parsing PDF → ${ebiJsonPath} (+Turso)`);
-    await parsePdfToJson(pdfPath, ebiJsonPath, {
-      analyze: opts.analyze !== false,
-      db,
-    });
+    if (pdfPath) {
+      console.log(`Step 1/3: Parsing PDF → ${ebiJsonPath} (+Turso)`);
+      await parsePdfToJson(pdfPath, ebiJsonPath, {
+        analyze: opts.analyze !== false,
+        db,
+      });
+    } else {
+      console.log(`Step 1/3: Fetching holdings table → ${ebiJsonPath} (+Turso)`);
+      const ebi = await fetchEbiHoldings();
+      await writeHoldingsOutputs(ebi, { jsonPath: ebiJsonPath, db });
+      console.log(
+        `✅ ${Object.keys(ebi.holdings).length} holdings as of ${ebi.asOfDate ?? "unknown"}`
+      );
+    }
 
     // Step 2: Fetch baseline ETF holdings -> JSON + Turso
     console.log("");

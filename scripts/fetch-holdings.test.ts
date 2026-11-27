@@ -6,7 +6,7 @@ import {
   fetchEtfHoldings,
   fetchAndStoreManyEtfHoldings,
 } from "@/src/holdings/fetch";
-import { openHoldingsDb } from "@/src/lib/db";
+import { openTestDb } from "@/src/lib/test-db";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "ebi-holdings-"));
@@ -52,13 +52,6 @@ describe("holdings fetch (FMP)", () => {
   });
 
   test("fetchAndStoreManyEtfHoldings writes JSON and Turso", async () => {
-    // Skip test if Turso credentials are not set
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(
-        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
-      );
-      return;
-    }
 
     const tmpDir = makeTempDir();
     const outDir = path.join(tmpDir, "data");
@@ -95,7 +88,7 @@ describe("holdings fetch (FMP)", () => {
       });
     };
 
-    const db = await openHoldingsDb();
+    const db = await openTestDb();
     try {
       const res = await fetchAndStoreManyEtfHoldings(["VTI", "VTV"], {
         outDir,

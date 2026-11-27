@@ -35,6 +35,43 @@ interface PortfolioComparisonProps {
   };
 }
 
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    value?: number;
+    color?: string;
+  }>;
+  label?: string;
+}
+
+function CustomTooltip({ active, payload, label }: TooltipProps) {
+  if (active && payload && payload.length && label) {
+    return (
+      <div className="bg-white p-4 border rounded-lg shadow-sm">
+        <p className="font-medium">{formatDate(label)}</p>
+        <div className="mt-2 space-y-1">
+          {payload.map((entry, index: number) => (
+            <p key={`item-${index}`} style={{ color: entry.color }}>
+              {entry.name}:{" "}
+              {entry.value !== undefined ? entry.value.toFixed(2) : "N/A"}%
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function PortfolioComparison({
   approximationWeights,
 }: PortfolioComparisonProps) {
@@ -164,43 +201,6 @@ export function PortfolioComparison({
 
     fetchPerformanceData();
   }, [weights]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  interface TooltipProps {
-    active?: boolean;
-    payload?: Array<{
-      name?: string;
-      value?: number;
-      color?: string;
-    }>;
-    label?: string;
-  }
-
-  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-    if (active && payload && payload.length && label) {
-      return (
-        <div className="bg-white p-4 border rounded-lg shadow-sm">
-          <p className="font-medium">{formatDate(label)}</p>
-          <div className="mt-2 space-y-1">
-            {payload.map((entry, index: number) => (
-              <p key={`item-${index}`} style={{ color: entry.color }}>
-                {entry.name}:{" "}
-                {entry.value !== undefined ? entry.value.toFixed(2) : "N/A"}%
-              </p>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   if (loading || !weights) {
     return (

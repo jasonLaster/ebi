@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 /// <reference types="node" />
 
+import { openTestDb } from "@/src/lib/test-db";
 import { describe, test, expect, afterAll } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
@@ -145,16 +146,7 @@ describe("parsePdfToJson function", () => {
       return;
     }
 
-    // Skip test if Turso credentials are not set
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(
-        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
-      );
-      return;
-    }
-
-    const { openHoldingsDb } = await import("../src/lib/db");
-    const db = await openHoldingsDb();
+    const db = await openTestDb();
     try {
       const result = await parsePdfToJson(inputPdfPath, testOutputPath, {
         analyze: false,
@@ -216,18 +208,10 @@ describe("parsePdfToJson function", () => {
       return;
     }
 
-    // Skip test if Turso credentials are not set
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(
-        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
-      );
-      return;
-    }
 
     // Test with analyze enabled (should output analysis)
     const outputPath1 = path.join(tmpDir, "test_output_analyze.json");
-    const { openHoldingsDb } = await import("../src/lib/db");
-    const db = await openHoldingsDb();
+    const db = await openTestDb();
     try {
       const result1 = await parsePdfToJson(inputPdfPath, outputPath1, {
         analyze: true,
