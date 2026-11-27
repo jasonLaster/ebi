@@ -165,6 +165,18 @@ export async function storeHoldingsData(
   await upsertHoldingsForEtf(db, etfId, date, data.holdings);
 }
 
+/**
+ * id of an ETF's latest snapshot that actually has holdings (empty rows, such
+ * as old test pollution, are skipped). Takes the symbol as its one parameter.
+ */
+const LATEST_SNAPSHOT_ID_SQL = `
+  SELECT e.id FROM etfs e
+  WHERE e.symbol = ?
+    AND EXISTS (SELECT 1 FROM holdings x WHERE x.etf_id = e.id)
+  ORDER BY e.date DESC, e.id DESC
+  LIMIT 1
+`;
+
 export async function getHoldingsWeightMap(
   db: HoldingsDb,
   etfSymbol: string,
@@ -180,14 +192,7 @@ export async function getHoldingsWeightMap(
     sql: `
       SELECT h.ticker as ticker, h.${weightField} as weight
       FROM holdings h
-      WHERE h.etf_id = (
-        -- Latest snapshot that actually has holdings (skips empty rows).
-        SELECT e.id FROM etfs e
-        WHERE e.symbol = ?
-          AND EXISTS (SELECT 1 FROM holdings x WHERE x.etf_id = e.id)
-        ORDER BY e.date DESC, e.id DESC
-        LIMIT 1
-      )
+      WHERE h.etf_id = (${LATEST_SNAPSHOT_ID_SQL})
     `,
     args: [symbol],
   });
@@ -282,4 +287,118 @@ export async function setPerformanceCache(
     `,
     args: [cacheKey, asofDate, now, payloadJson],
   });
+}
+
+/** The latest non-empty snapshot for an ETF. */
+export async function getLatestSnapshot(
+  db: HoldingsDb,
+  etfSymbol: string
+): Promise<{
+  etfId: number;
+  date: string;
+  holdings: Array<{ ticker: string; actual_weight: number }>;
+} | null> {
+  const etf = await db.execute({
+    sql: `SELECT id, date FROM etfs WHERE id = (${LATEST_SNAPSHOT_ID_SQL})`,
+    args: [etfSymbol.toUpperCase()],
+  });
+  if (etf.rows.length === 0) return null;
+  const etfId = Number(etf.rows[0].id);
+  const rows = await db.execute({
+    sql: `SELECT ticker, actual_weight FROM holdings WHERE etf_id = ?`,
+    args: [etfId],
+  });
+  return {
+    etfId,
+    date: String(etf.rows[0].date),
+    holdings: rows.rows.map((r) => ({
+      ticker: String(r.ticker),
+      actual_weight: Number(r.actual_weight),
+    })),
+  };
+}
+
+/** Saves per-holding P/E and the fund's weighted P/E on a snapshot. */
+export async function storePeRatios(
+  db: HoldingsDb,
+  etfId: number,
+  peByTicker: Map<string, number | null>,
+  weightedPe: number | null
+): Promise<void> {
+  const statements = Array.from(peByTicker, ([ticker, pe]) => ({
+    sql: `UPDATE holdings SET pe_ratio = ? WHERE etf_id = ? AND ticker = ?`,
+    args: [pe, etfId, ticker],
+  }));
+  statements.push({
+    sql: `UPDATE etfs SET weighted_pe_ratio = ?, pe_ratio_updated_at = ? WHERE id = ?`,
+    args: [weightedPe, new Date().toISOString(), etfId],
+  });
+  await db.batch(statements, "write");
+}
+
+/** Weighted P/E (and as-of date) from each ETF's latest snapshot. */
+export async function getLatestPeRatios(
+  db: HoldingsDb,
+  symbols: string[]
+): Promise<Record<string, { peRatio: number | null; date: string } | null>> {
+  const out: Record<string, { peRatio: number | null; date: string } | null> = {};
+  for (const symbol of symbols) {
+    const r = await db.execute({
+      sql: `SELECT weighted_pe_ratio AS pe, date FROM etfs WHERE id = (${LATEST_SNAPSHOT_ID_SQL})`,
+      args: [symbol.toUpperCase()],
+    });
+    const row = r.rows[0];
+    out[symbol.toLowerCase()] = row
+      ? { peRatio: row.pe === null ? null : Number(row.pe), date: String(row.date) }
+      : null;
+  }
+  return out;
+}
+
+/** Full latest snapshot for an ETF (for download), including P/E. */
+export async function getLatestHoldingsData(
+  db: HoldingsDb,
+  etfSymbol: string
+): Promise<
+  | (HoldingsData & {
+      date: string;
+      weightedPeRatio: number | null;
+      holdings: Record<string, Holding & { pe_ratio: number | null }>;
+    })
+  | null
+> {
+  const symbol = etfSymbol.toUpperCase();
+  const etf = await db.execute({
+    sql: `SELECT id, date, last_updated, weighted_pe_ratio FROM etfs WHERE id = (${LATEST_SNAPSHOT_ID_SQL})`,
+    args: [symbol],
+  });
+  const e = etf.rows[0];
+  if (!e) return null;
+  const rows = await db.execute({
+    sql: `
+      SELECT ticker, name, weight, market_value, actual_weight, price, shares, pe_ratio
+      FROM holdings WHERE etf_id = ? ORDER BY actual_weight DESC
+    `,
+    args: [Number(e.id)],
+  });
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const holdings: Record<string, Holding & { pe_ratio: number | null }> = {};
+  for (const r of rows.rows) {
+    holdings[String(r.ticker)] = {
+      name: String(r.name),
+      weight: Number(r.weight),
+      market_value: Number(r.market_value),
+      actual_weight: Number(r.actual_weight),
+      price: num(r.price),
+      shares: Number(r.shares),
+      pe_ratio: num(r.pe_ratio),
+    };
+  }
+  return {
+    etfSymbol: symbol,
+    date: String(e.date),
+    lastUpdated: String(e.last_updated),
+    weightedPeRatio: num(e.weighted_pe_ratio),
+    holdings,
+  };
 }

@@ -66,6 +66,8 @@ interface ApiResponse {
   };
   individualPerformance: IndividualPerformance;
   performanceDeltas: Record<string, number | string>; // Deltas can be numbers or "N/A"
+  /** Weighted P/E from the latest synced holdings, keyed by lowercase symbol. */
+  peRatios?: Record<string, { peRatio: number | null; date: string } | null>;
   historicalPrices: HistoricalPrices;
   deltaNote: string;
 }
@@ -143,6 +145,37 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   }
   return null;
 };
+
+function PeCell({
+  pe,
+}: {
+  pe: { peRatio: number | null; date: string } | null | undefined;
+}) {
+  if (!pe || pe.peRatio === null) {
+    return <span className="text-gray-400">N/A</span>;
+  }
+  return (
+    <span title={`Weighted harmonic P/E of holdings as of ${pe.date}`}>
+      {pe.peRatio.toFixed(1)}
+    </span>
+  );
+}
+
+function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
+  return (
+    <>
+      <div className="font-bold">{symbol}</div>
+      <div className="text-xs text-gray-500 sm:hidden">{name}</div>
+      <a
+        href={`/api/holdings/${symbol.toLowerCase()}`}
+        className="text-xs font-normal text-blue-600 hover:underline"
+        download
+      >
+        Holdings JSON
+      </a>
+    </>
+  );
+}
 
 export default function ETFDashboard() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
@@ -453,10 +486,10 @@ export default function ETFDashboard() {
   const symbolDisplayData = [
     {
       symbol: "EBI",
-      name: "iShares ESG Aware MSCI EM ETF",
+      name: "Longview Advantage ETF",
       perfData: ebiPerfData,
       deltaKey: "ebi_iwv",
-      description: "iShares ESG Aware MSCI EM ETF",
+      description: "Longview Advantage ETF",
     },
     {
       symbol: "IWN",
@@ -525,16 +558,19 @@ export default function ETFDashboard() {
               >
                 Delta vs IWV
               </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:px-6"
+              >
+                P/E
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {symbolDisplayData.slice(0, 3).map((item) => (
               <tr key={item.symbol} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
-                  <div className="font-bold">{item.symbol}</div>
-                  <div className="text-xs text-gray-500 sm:hidden">
-                    {item.name}
-                  </div>
+                  <SymbolCell symbol={item.symbol} name={item.name} />
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
                   {item.description}
@@ -586,13 +622,19 @@ export default function ETFDashboard() {
                     <span className="text-gray-400">N/A</span>
                   )}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <PeCell pe={apiData.peRatios?.[item.symbol.toLowerCase()]} />
+                </td>
               </tr>
             ))}
 
             {/* Separator Row for IWV (Baseline) */}
             <tr className="bg-gray-50">
               <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800 sm:px-6">
-                {benchmarkSymbolData.symbol}
+                <SymbolCell
+                  symbol={benchmarkSymbolData.symbol}
+                  name={benchmarkSymbolData.name}
+                />
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell sm:px-6">
                 {benchmarkSymbolData.description}
@@ -629,16 +671,16 @@ export default function ETFDashboard() {
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 sm:px-6">
                 Baseline
               </td>
+              <td className="px-4 py-3 whitespace-nowrap text-sm sm:px-6">
+                <PeCell pe={apiData.peRatios?.iwv} />
+              </td>
             </tr>
 
             {/* VTI Row (after separator) */}
             {symbolDisplayData.slice(3).map((item) => (
               <tr key={item.symbol} className="hover:bg-gray-50">
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sm:px-6">
-                  <div className="font-bold">{item.symbol}</div>
-                  <div className="text-xs text-gray-500 sm:hidden">
-                    {item.name}
-                  </div>
+                  <SymbolCell symbol={item.symbol} name={item.name} />
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell sm:px-6">
                   {item.description}
@@ -689,6 +731,9 @@ export default function ETFDashboard() {
                   ) : (
                     <span className="text-gray-400">N/A</span>
                   )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm sm:px-6">
+                  <PeCell pe={apiData.peRatios?.[item.symbol.toLowerCase()]} />
                 </td>
               </tr>
             ))}

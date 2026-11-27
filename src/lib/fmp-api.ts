@@ -128,3 +128,41 @@ export function normalizeFmpHoldingsToMap(
 
   return holdings;
 }
+
+type FmpQuote = { symbol?: string; pe?: number | null };
+
+/** Tickers per batch-quote request (keeps the URL ~2KB). */
+export const QUOTE_BATCH_SIZE = 500;
+
+/**
+ * Trailing P/E for many tickers via FMP's batch quote endpoint
+ * (`/quote/A,B,C`), QUOTE_BATCH_SIZE tickers per request. Tickers FMP
+ * doesn't return, or quotes without a P/E (e.g. negative earnings), map to null.
+ */
+export async function fetchPeRatiosFromFmp(
+  tickers: string[],
+  opts?: { apiKey?: string; fetchImpl?: FetchLike }
+): Promise<Map<string, number | null>> {
+  const apiKey = opts?.apiKey ?? getFmpApiKey();
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const unique = Array.from(new Set(tickers.map((t) => t.trim().toUpperCase()))).filter(Boolean);
+
+  const out = new Map<string, number | null>(unique.map((t) => [t, null]));
+  for (let i = 0; i < unique.length; i += QUOTE_BATCH_SIZE) {
+    const batch = unique.slice(i, i + QUOTE_BATCH_SIZE);
+    const url = `${BASE_URL}/quote/${batch.map(encodeURIComponent).join(",")}?apikey=${apiKey}`;
+    const res = await fetchImpl(url);
+    if (!res.ok) {
+      throw new Error(`FMP batch quote failed: ${res.status} ${res.statusText}`);
+    }
+    const json = (await res.json()) as unknown;
+    if (!Array.isArray(json)) continue;
+    for (const q of json as FmpQuote[]) {
+      const symbol = q.symbol?.toUpperCase();
+      if (symbol && typeof q.pe === "number" && Number.isFinite(q.pe)) {
+        out.set(symbol, q.pe);
+      }
+    }
+  }
+  return out;
+}
