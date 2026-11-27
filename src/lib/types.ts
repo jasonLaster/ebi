@@ -9,6 +9,8 @@ export interface Holding {
 
 export interface HoldingsData {
   etfSymbol: string;
+  /** Snapshot date, YYYY-MM-DD. Defaults to the date part of lastUpdated. */
+  date?: string;
   lastUpdated: string;
   holdings: Record<string, Holding>;
 }

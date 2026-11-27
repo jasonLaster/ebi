@@ -62,6 +62,17 @@ export async function fetchEtfHoldingsFromFmp(
   return json as FmpEtfHolding[];
 }
 
+/** Latest `updated` date (YYYY-MM-DD) in an FMP etf-holder payload. */
+export function latestFmpDate(raw: FmpEtfHolding[]): string | null {
+  return (
+    raw
+      .map((h) => h.updated?.slice(0, 10))
+      .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort()
+      .at(-1) ?? null
+  );
+}
+
 export function normalizeFmpHoldingsToMap(
   symbol: string,
   raw: FmpEtfHolding[]

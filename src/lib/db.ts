@@ -20,12 +20,22 @@ export async function openHoldingsDb(): Promise<HoldingsDb> {
 }
 
 export async function ensureSchema(db: HoldingsDb): Promise<void> {
+  // Holdings are stored as dated snapshots: one `etfs` row per (symbol, date)
+  // and that day's holdings under it. This matches the production schema.
+  // The P/E columns are populated by the (unmerged) `pe` branch; kept here so a
+  // fresh database has the same shape as production.
   await db.execute(`
     CREATE TABLE IF NOT EXISTS etfs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      symbol TEXT NOT NULL UNIQUE,
-      last_updated TEXT NOT NULL
+      symbol TEXT NOT NULL,
+      date TEXT NOT NULL,
+      last_updated TEXT NOT NULL,
+      weighted_pe_ratio REAL,
+      pe_ratio_updated_at TEXT
     )
+  `);
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_etfs_symbol_date ON etfs(symbol, date)
   `);
 
   await db.execute(`
@@ -33,13 +43,15 @@ export async function ensureSchema(db: HoldingsDb): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       etf_id INTEGER NOT NULL,
       ticker TEXT NOT NULL,
+      date TEXT NOT NULL,
       name TEXT NOT NULL,
       weight REAL NOT NULL,
       market_value REAL NOT NULL,
       actual_weight REAL NOT NULL,
       price REAL,
       shares REAL NOT NULL,
-      UNIQUE(etf_id, ticker),
+      pe_ratio REAL,
+      UNIQUE(etf_id, ticker, date),
       FOREIGN KEY(etf_id) REFERENCES etfs(id) ON DELETE CASCADE
     )
   `);
@@ -67,24 +79,30 @@ export async function ensureSchema(db: HoldingsDb): Promise<void> {
   `);
 }
 
+/** Snapshot date (YYYY-MM-DD) for a holdings payload. */
+export function snapshotDate(data: HoldingsData): string {
+  return data.date ?? data.lastUpdated.slice(0, 10);
+}
+
 export async function upsertEtf(
   db: HoldingsDb,
   symbol: string,
+  date: string,
   lastUpdated: string
 ): Promise<number> {
   const upper = symbol.toUpperCase();
   await db.execute({
     sql: `
-      INSERT INTO etfs(symbol, last_updated)
-      VALUES (?, ?)
-      ON CONFLICT(symbol) DO UPDATE SET last_updated = excluded.last_updated
+      INSERT INTO etfs(symbol, date, last_updated)
+      VALUES (?, ?, ?)
+      ON CONFLICT(symbol, date) DO UPDATE SET last_updated = excluded.last_updated
     `,
-    args: [upper, lastUpdated],
+    args: [upper, date, lastUpdated],
   });
 
   const result = await db.execute({
-    sql: `SELECT id FROM etfs WHERE symbol = ?`,
-    args: [upper],
+    sql: `SELECT id FROM etfs WHERE symbol = ? AND date = ?`,
+    args: [upper, date],
   });
 
   if (result.rows.length === 0) {
@@ -100,15 +118,16 @@ export async function upsertEtf(
 export async function upsertHoldingsForEtf(
   db: HoldingsDb,
   etfId: number,
+  date: string,
   holdings: Record<string, Holding>
 ): Promise<void> {
   const statements = Object.entries(holdings).map(([ticker, h]) => ({
     sql: `
       INSERT INTO holdings(
-        etf_id, ticker, name, weight, market_value, actual_weight, price, shares
+        etf_id, ticker, date, name, weight, market_value, actual_weight, price, shares
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(etf_id, ticker) DO UPDATE SET
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(etf_id, ticker, date) DO UPDATE SET
         name = excluded.name,
         weight = excluded.weight,
         market_value = excluded.market_value,
@@ -119,6 +138,7 @@ export async function upsertHoldingsForEtf(
     args: [
       etfId,
       ticker,
+      date,
       h.name,
       h.weight,
       h.market_value,
@@ -128,8 +148,8 @@ export async function upsertHoldingsForEtf(
     ],
   }));
 
-  // Replace the ETF's holdings in one transaction so positions the fund has
-  // exited don't linger (an upsert alone never removes them).
+  // Replace this snapshot's holdings in one transaction so positions the fund
+  // has exited don't linger when a day is re-synced.
   await db.batch(
     [{ sql: `DELETE FROM holdings WHERE etf_id = ?`, args: [etfId] }, ...statements],
     "write"
@@ -140,8 +160,9 @@ export async function storeHoldingsData(
   db: HoldingsDb,
   data: HoldingsData
 ): Promise<void> {
-  const etfId = await upsertEtf(db, data.etfSymbol, data.lastUpdated);
-  await upsertHoldingsForEtf(db, etfId, data.holdings);
+  const date = snapshotDate(data);
+  const etfId = await upsertEtf(db, data.etfSymbol, date, data.lastUpdated);
+  await upsertHoldingsForEtf(db, etfId, date, data.holdings);
 }
 
 export async function getHoldingsWeightMap(
@@ -159,8 +180,14 @@ export async function getHoldingsWeightMap(
     sql: `
       SELECT h.ticker as ticker, h.${weightField} as weight
       FROM holdings h
-      JOIN etfs e ON e.id = h.etf_id
-      WHERE e.symbol = ?
+      WHERE h.etf_id = (
+        -- Latest snapshot that actually has holdings (skips empty rows).
+        SELECT e.id FROM etfs e
+        WHERE e.symbol = ?
+          AND EXISTS (SELECT 1 FROM holdings x WHERE x.etf_id = e.id)
+        ORDER BY e.date DESC, e.id DESC
+        LIMIT 1
+      )
     `,
     args: [symbol],
   });

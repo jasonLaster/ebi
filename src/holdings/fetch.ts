@@ -1,5 +1,6 @@
 import {
   fetchEtfHoldingsFromFmp,
+  latestFmpDate,
   normalizeFmpHoldingsToMap,
   FetchLike,
 } from "@/src/lib/fmp-api";
@@ -20,6 +21,7 @@ export async function fetchEtfHoldings(
   const holdings = normalizeFmpHoldingsToMap(upper, raw);
   return {
     etfSymbol: upper,
+    date: latestFmpDate(raw) ?? undefined,
     lastUpdated: new Date().toISOString(),
     holdings,
   };

@@ -1,6 +1,7 @@
 import { Holding, HoldingsData } from "@/src/lib/types";
 import {
   fetchEtfHoldingsFromFmp,
+  latestFmpDate,
   normalizeFmpHoldingsToMap,
   type FetchLike as FmpFetchLike,
 } from "@/src/lib/fmp-api";
@@ -146,14 +147,11 @@ export async function fetchEbiHoldingsFromFmp(opts?: {
   const holdings = normalizeFmpHoldingsToMap("EBI", raw);
   assertEnoughHoldings(Object.keys(holdings).length, "FMP etf-holder/EBI");
 
-  const updated = raw
-    .map((h) => h.updated?.slice(0, 10))
-    .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d))
-    .sort()
-    .at(-1);
+  const updated = latestFmpDate(raw);
 
   return {
     etfSymbol: "EBI",
+    date: updated ?? undefined,
     lastUpdated: updated
       ? new Date(`${updated}T00:00:00Z`).toISOString()
       : new Date().toISOString(),
@@ -206,6 +204,7 @@ export async function fetchEbiHoldings(opts?: {
 
   return {
     etfSymbol: "EBI",
+    date: asOfDate ?? undefined,
     lastUpdated: asOfDate
       ? new Date(`${asOfDate}T00:00:00Z`).toISOString()
       : new Date().toISOString(),
