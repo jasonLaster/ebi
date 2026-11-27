@@ -1,10 +1,11 @@
 import { describe, test, expect } from "bun:test";
-import { openHoldingsDb, storeHoldingsData } from "@/src/lib/db";
+import { storeHoldingsData, type HoldingsDb } from "@/src/lib/db";
+import { openTestDb } from "@/src/lib/test-db";
 import type { HoldingsData } from "@/src/lib/types";
 import { runApproximation } from "@/src/approximation/optimize";
 
 async function writeEtf(
-  db: Awaited<ReturnType<typeof openHoldingsDb>>,
+  db: HoldingsDb,
   data: HoldingsData
 ): Promise<void> {
   await storeHoldingsData(db, data);
@@ -12,15 +13,8 @@ async function writeEtf(
 
 describe("approximation (Turso-backed)", () => {
   test("returns valid weights that satisfy constraints", async () => {
-    // Skip test if Turso credentials are not set
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(
-        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
-      );
-      return;
-    }
 
-    const db = await openHoldingsDb();
+    const db = await openTestDb();
     try {
       // Construct a toy problem where EBI is exactly 75% VTI + 25% IWN.
       // Use actual_weight everywhere (same as weight in this fixture).
@@ -147,15 +141,8 @@ describe("approximation (Turso-backed)", () => {
   });
 
   test("throws if baselineEtfs is empty", async () => {
-    // Skip test if Turso credentials are not set
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(
-        "Skipping test: TURSO_DATABASE_URL and TURSO_AUTH_TOKEN not set"
-      );
-      return;
-    }
 
-    const db = await openHoldingsDb();
+    const db = await openTestDb();
     try {
       await writeEtf(db, {
         etfSymbol: "EBI",

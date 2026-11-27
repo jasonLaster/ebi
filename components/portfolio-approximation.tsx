@@ -46,50 +46,68 @@ interface PortfolioApproximationData {
   };
 }
 
+type ApproximationResult =
+  | { data: PortfolioApproximationData }
+  | { error: string };
+
+async function requestApproximation(
+  method: "GET" | "POST"
+): Promise<ApproximationResult> {
+  try {
+    const response = await fetch("/api/portfolio-approximation", { method });
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    return { data: (await response.json()) as PortfolioApproximationData };
+  } catch (err) {
+    console.error("Failed to fetch portfolio approximation data:", err);
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to load data. Please run the approximation script first.",
+    };
+  }
+}
+
 export function PortfolioApproximation() {
   const [data, setData] = useState<PortfolioApproximationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const response = await fetch("/api/portfolio-approximation", {
-        method: isRefresh ? "POST" : "GET",
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const result: PortfolioApproximationData = await response.json();
-      setData(result);
+  const applyResult = (result: ApproximationResult) => {
+    if ("data" in result) {
+      setData(result.data);
       setError(null);
-    } catch (err) {
-      console.error("Failed to fetch portfolio approximation data:", err);
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to load data. Please run the approximation script first.";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } else {
+      setError(result.error);
     }
+    setLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(() => {
-    fetchData();
+    // `loading` starts true, so the initial load needs no synchronous setState.
+    let cancelled = false;
+    requestApproximation("GET").then((result) => {
+      if (cancelled) return;
+      if ("data" in result) {
+        setData(result.data);
+        setError(null);
+      } else {
+        setError(result.error);
+      }
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleRefresh = () => {
-    fetchData(true);
+    setRefreshing(true);
+    void requestApproximation("POST").then(applyResult);
   };
 
   if (loading) {

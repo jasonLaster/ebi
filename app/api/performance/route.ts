@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { openHoldingsDb, getPerformanceCache, setPerformanceCache } from "@/src/lib/db";
-
-// Debug: API route loaded
-console.log("[EBI API] route.ts loaded");
+import { notifyIssue } from "@/src/lib/notify";
+import { measure } from "@/src/lib/trace";
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
 
@@ -149,6 +148,7 @@ export async function GET() {
   console.log("[EBI API] GET handler called");
   if (!FMP_API_KEY) {
     console.error("[EBI API] FMP_API_KEY environment variable is not set.");
+    await notifyIssue({ subject: "FMP_API_KEY is not set (/api/performance)" });
     return NextResponse.json(
       { error: "FMP_API_KEY environment variable is not set." },
       { status: 500 }
@@ -186,10 +186,10 @@ export async function GET() {
   } = {};
 
   for (const symbol of symbolsToCompare) {
-    const historicalDataArray = await getHistoricalData(
-      symbol,
-      startDateStr,
-      endDateStr
+    const historicalDataArray = await measure(
+      "performance.fetch-historical",
+      { "etf.symbol": symbol },
+      () => getHistoricalData(symbol, startDateStr, endDateStr)
     );
 
     if (historicalDataArray.length > 0) {
@@ -310,6 +310,23 @@ export async function GET() {
     deltaNote:
       "Positive delta means the first symbol performed better than the second by that percentage point difference.",
   };
+
+  const failedSymbols = results.filter((r) => r.error).map((r) => r.symbol);
+  if (failedSymbols.length > 0) {
+    await notifyIssue({
+      subject: "FMP historical prices failed (/api/performance)",
+      context: {
+        failedSymbols: failedSymbols.join(","),
+        errors: results
+          .filter((r) => r.error)
+          .map((r) => `${r.symbol}: ${r.error}`)
+          .join("; "),
+      },
+    });
+    // Don't cache partial results for 24h; retry on the next request.
+    db.close();
+    return NextResponse.json(finalJsonOutput);
+  }
 
   // Store in cache
   try {

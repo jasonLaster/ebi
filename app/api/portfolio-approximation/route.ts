@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { openHoldingsDb } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
+import { notifyIssue } from "@/src/lib/notify";
+import { measure } from "@/src/lib/trace";
 
 export const maxDuration = 300; // seconds (Vercel will cap based on your plan)
 
@@ -14,9 +16,11 @@ async function getApproximationResults() {
 
   const db = await openHoldingsDb();
   try {
-    const results = await runApproximation(db, target, baselines, {
-      weightField: "actual_weight",
-    });
+    const results = await measure(
+      "approximation.run",
+      { "etf.target": target, "etf.baselines": baselines.join(",") },
+      () => runApproximation(db, target, baselines, { weightField: "actual_weight" })
+    );
 
     // Add additional analysis
     const enhancedResults = {
@@ -53,6 +57,10 @@ export async function GET() {
     return NextResponse.json(results);
   } catch (error) {
     console.error("Error running portfolio approximation:", error);
+    await notifyIssue({
+      subject: "Portfolio approximation failed (/api/portfolio-approximation)",
+      error,
+    });
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error occurred";
     return NextResponse.json(
@@ -62,18 +70,5 @@ export async function GET() {
   }
 }
 
-export async function POST() {
-  try {
-    // POST does the same thing as GET - runs approximation and returns results
-    const results = await getApproximationResults();
-    return NextResponse.json(results);
-  } catch (error) {
-    console.error("Error running portfolio approximation:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json(
-      { error: "Failed to run portfolio approximation", details: errorMessage },
-      { status: 500 }
-    );
-  }
-}
+// POST does the same thing as GET.
+export const POST = GET;

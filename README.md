@@ -15,7 +15,7 @@ The dashboard provides:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - Bun
 - Financial Modeling Prep API key
 
@@ -233,17 +233,23 @@ Where:
 
 ### Data Sources
 
-- **Holdings Data**: ETF provider holdings files
-- **Market Data**: Financial Modeling Prep API
-- **Historical Prices**: Real-time market data
+- **EBI holdings**: FMP `etf-holder/EBI` (same API as the baselines), falling back automatically to the holdings table on [Longview's fund page](https://longviewresearchpartners.com/ebi/fund-data/) with an alert email (`src/holdings/fetch-ebi.ts`). `bun run sync <pdf>` still parses a holdings PDF manually.
+- **Baseline holdings & prices**: Financial Modeling Prep API
+
+### Operations
+
+- **Daily sync**: Vercel Cron calls `GET /api/sync` at 05:00 UTC. Full syncs require `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends it automatically); `?test=true` runs the read-only approximation and is used as the post-deploy smoke test.
+- **Issue emails**: `src/lib/notify.ts` emails `ALERT_EMAIL_TO` through Resend when a sync fails, the published holdings are stale (> 5 days), FMP price fetches fail, the approximation fails, or Next.js captures an unhandled server error (`onRequestError` in `instrumentation.ts`). Without `RESEND_API_KEY`/`ALERT_EMAIL_TO` it just logs.
+- **Tracing**: `instrumentation.ts` registers `@vercel/otel`; sync steps, FMP fetches, and the optimizer run in custom spans (`src/lib/trace.ts`). Inspect with `vercel traces search --project ebi`.
+- **Metrics**: `sync.run` (by `mode`/`outcome`), `sync.duration_ms`, and `sync.ebi_holdings` via `metric()` from `@vercel/functions`.
 
 ### Technologies Used
 
-- **Frontend**: Next.js 15, React 19, TypeScript
+- **Frontend**: Next.js 16, React 19, TypeScript
 - **UI**: shadcn/ui, Tailwind CSS, Recharts
 - **Optimization**: Alglib.js (WASM-based)
-- **Data Processing**: Node.js, ES modules
-- **API**: Financial Modeling Prep
+- **Runtime**: Node.js on Vercel (Bun for installs, scripts, and tests)
+- **Storage**: Turso (libSQL)
 
 ## 🤝 Contributing
 

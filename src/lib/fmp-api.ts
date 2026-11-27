@@ -12,10 +12,14 @@ const BASE_URL = "https://financialmodelingprep.com/api/v3";
 export type FmpEtfHolding = {
   asset?: string; // ticker
   name?: string;
+  /** FMP's field name; `shares` is accepted for older payloads/fixtures. */
+  sharesNumber?: string | number;
   shares?: string | number;
   weightPercentage?: string | number;
   marketValue?: string | number;
   price?: string | number | null;
+  /** e.g. "2026-11-26 20:24:10" */
+  updated?: string;
 };
 
 export function getFmpApiKey(): string {
@@ -71,12 +75,15 @@ export function normalizeFmpHoldingsToMap(
       const weightPct = toNumber(h.weightPercentage);
       const weight = Number.isFinite(weightPct) ? weightPct / 100 : 0;
       const market_value = toNumber(h.marketValue);
-      const shares = toNumber(h.shares);
+      const shares = toNumber(h.sharesNumber ?? h.shares);
       const priceRaw = h.price ?? null;
+      // FMP's etf-holder payload has no price; derive it from value / shares.
       const priceNum =
-        priceRaw === null || typeof priceRaw === "undefined"
-          ? null
-          : toNumber(priceRaw);
+        priceRaw !== null && typeof priceRaw !== "undefined"
+          ? toNumber(priceRaw)
+          : shares > 0
+            ? market_value / shares
+            : null;
 
       return {
         ticker,
