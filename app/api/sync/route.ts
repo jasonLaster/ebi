@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { metric } from "@vercel/functions";
 import * as path from "path";
 
-import { fetchEbiHoldings, EBI_FUND_DATA_URL } from "@/src/holdings/fetch-ebi";
+import {
+  fetchEbiHoldingsWithFallback,
+  EBI_FUND_DATA_URL,
+} from "@/src/holdings/fetch-ebi";
 import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
 import { openHoldingsDb, storeHoldingsData } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
@@ -66,19 +69,26 @@ export async function GET(request: Request) {
     try {
       let ebiAsOfDate: string | null = null;
       let ebiHoldingsCount: number | undefined;
+      let ebiSource: string | undefined;
 
       if (!testMode) {
         step = "fetch-ebi-holdings";
-        const ebi = await measure(
-          "sync.fetch-ebi-holdings",
-          { "http.url": EBI_FUND_DATA_URL },
-          () => fetchEbiHoldings()
+        const ebi = await measure("sync.fetch-ebi-holdings", {}, () =>
+          fetchEbiHoldingsWithFallback()
         );
         ebiAsOfDate = ebi.asOfDate;
         ebiHoldingsCount = Object.keys(ebi.holdings).length;
+        ebiSource = ebi.source;
         console.log(
-          `✅ Fetched ${ebiHoldingsCount} EBI holdings (as of ${ebiAsOfDate ?? "unknown"})`
+          `✅ Fetched ${ebiHoldingsCount} EBI holdings from ${ebi.source} (as of ${ebiAsOfDate ?? "unknown"})`
         );
+        if (ebi.primaryError) {
+          await notifyIssue({
+            subject: "EBI holdings: FMP failed, used Longview page fallback",
+            error: ebi.primaryError,
+            context: { fallback: EBI_FUND_DATA_URL },
+          });
+        }
 
         step = "store-ebi-holdings";
         await measure(
@@ -103,8 +113,8 @@ export async function GET(request: Request) {
           await notifyIssue({
             subject: "EBI holdings look stale",
             context: {
-              asOfDate: ebiAsOfDate ?? "not found on page",
-              source: EBI_FUND_DATA_URL,
+              asOfDate: ebiAsOfDate ?? "unknown",
+              source: ebiSource,
               staleAfterDays: STALE_AFTER_DAYS,
             },
           });
@@ -124,7 +134,9 @@ export async function GET(request: Request) {
       metric("sync.run", 1, { mode, outcome: "success" });
       metric("sync.duration_ms", Date.now() - startedAt, { mode });
       if (ebiHoldingsCount !== undefined) {
-        metric("sync.ebi_holdings", ebiHoldingsCount);
+        metric("sync.ebi_holdings", ebiHoldingsCount, {
+          source: ebiSource ?? "unknown",
+        });
       }
 
       console.log(`✅ ${testMode ? "Test" : "Sync"} complete`, {
@@ -142,6 +154,7 @@ export async function GET(request: Request) {
         testMode,
         ebiAsOfDate,
         ebiHoldingsCount,
+        ebiSource,
         timestamp: results.timestamp,
         targetEtf: results.targetEtf,
         baselineEtfs: results.baselineEtfs,

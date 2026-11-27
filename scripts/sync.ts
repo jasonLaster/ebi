@@ -6,8 +6,7 @@ import { parsePdfToJson } from "@/src/holdings/parse-pdf";
 import { fetchAndStoreManyEtfHoldings } from "@/src/holdings/fetch";
 import { openHoldingsDb } from "@/src/lib/db";
 import { runApproximation } from "@/src/approximation/optimize";
-import { downloadHoldingsPdf } from "./download-holdings-pdf";
-import { fetchEbiHoldings, EBI_FUND_DATA_URL } from "@/src/holdings/fetch-ebi";
+import { fetchEbiHoldingsWithFallback } from "@/src/holdings/fetch-ebi";
 import { writeHoldingsOutputs } from "@/src/holdings/storage";
 
 function resolvePath(p: string): string {
@@ -29,7 +28,7 @@ async function main(): Promise<void> {
     )
     .argument(
       "[pdf]",
-      "Path to an EBI holdings PDF (default: fetch the live holdings table from the fund page)"
+      "Path to an EBI holdings PDF (default: FMP, falling back to Longview's fund page)"
     )
     .option("-o, --out-dir <dir>", "Output directory", "data")
     .option("--target <symbol>", "Target ETF symbol", "EBI")
@@ -45,10 +44,6 @@ async function main(): Promise<void> {
     )
     .option("--api-key <key>", "Override FMP_API_KEY env var")
     .option("--no-analyze", "Skip PDF holdings analysis output")
-    .option(
-      "--download",
-      "Download the PDF via Hyperbrowser instead of fetching the HTML table"
-    )
     .parse(process.argv);
 
   const opts = program.opts<{
@@ -58,17 +53,12 @@ async function main(): Promise<void> {
     results: string;
     apiKey?: string;
     analyze: boolean;
-    download?: boolean;
   }>();
 
   const [pdfArg] = program.args as [string?];
 
   let pdfPath: string | null = null;
-  if (opts.download) {
-    console.log("📥 Downloading latest PDF via Hyperbrowser...");
-    pdfPath = await downloadHoldingsPdf();
-    console.log(`✅ Downloaded: ${pdfPath}\n`);
-  } else if (pdfArg) {
+  if (pdfArg) {
     pdfPath = resolvePath(pdfArg);
     if (!fs.existsSync(pdfPath)) {
       throw new Error(`PDF file not found: ${pdfPath}`);
@@ -89,7 +79,7 @@ async function main(): Promise<void> {
 
   console.log("🔄 Syncing holdings + approximation");
   console.log("==================================");
-  console.log(`Source:   ${pdfPath ?? EBI_FUND_DATA_URL}`);
+  console.log(`Source:   ${pdfPath ?? "FMP (fallback: Longview fund page)"}`);
   console.log(`Out dir:  ${outDir}`);
   console.log(`Target:   ${target}`);
   console.log(`Baseline: ${baselines.join(",")}`);
@@ -107,11 +97,11 @@ async function main(): Promise<void> {
         db,
       });
     } else {
-      console.log(`Step 1/3: Fetching holdings table → ${ebiJsonPath} (+Turso)`);
-      const ebi = await fetchEbiHoldings();
+      console.log(`Step 1/3: Fetching EBI holdings → ${ebiJsonPath} (+Turso)`);
+      const ebi = await fetchEbiHoldingsWithFallback({ fmp: { apiKey: opts.apiKey } });
       await writeHoldingsOutputs(ebi, { jsonPath: ebiJsonPath, db });
       console.log(
-        `✅ ${Object.keys(ebi.holdings).length} holdings as of ${ebi.asOfDate ?? "unknown"}`
+        `✅ ${Object.keys(ebi.holdings).length} holdings from ${ebi.source} as of ${ebi.asOfDate ?? "unknown"}`
       );
     }
 

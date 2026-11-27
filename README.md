@@ -233,7 +233,7 @@ Where:
 
 ### Data Sources
 
-- **EBI holdings**: the daily holdings table on [Longview's fund page](https://longviewresearchpartners.com/ebi/fund-data/), fetched and parsed directly (`src/holdings/fetch-ebi.ts`). The old PDF flow (`bun run sync <pdf>` or `--download` via Hyperbrowser) still works for manual runs.
+- **EBI holdings**: FMP `etf-holder/EBI` (same API as the baselines), falling back automatically to the holdings table on [Longview's fund page](https://longviewresearchpartners.com/ebi/fund-data/) with an alert email (`src/holdings/fetch-ebi.ts`). `bun run sync <pdf>` still parses a holdings PDF manually.
 - **Baseline holdings & prices**: Financial Modeling Prep API
 
 ### Operations

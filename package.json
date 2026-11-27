@@ -14,7 +14,6 @@
     "fetch:all": "bun scripts/fetch-holdings.ts --all",
     "approximate": "bun scripts/approximate-holdings.ts",
     "sync": "bun scripts/sync.ts",
-    "download:pdf": "bun scripts/download-holdings-pdf.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test:live": "RUN_LIVE_TESTS=1 bun test"
@@ -22,7 +21,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hyperbrowser/sdk": "^0.80.2",
     "@libsql/client": "^0.18.0",
     "@opentelemetry/api": "^1.10.0",
     "@radix-ui/react-progress": "^1.2.1",
@@ -31,7 +29,6 @@
     "@radix-ui/react-tooltip": "^1.4.1",
     "@vercel/functions": "^3.11.4",
     "@vercel/otel": "^2.3.0",
-    "adm-zip": "^0.5.18",
     "autoprefixer": "^10.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -50,7 +47,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
-    "@types/adm-zip": "^0.5.8",
     "@types/node": "^22.20.7",
     "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",

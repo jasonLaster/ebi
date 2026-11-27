@@ -1,10 +1,21 @@
 import { Holding, HoldingsData } from "@/src/lib/types";
+import {
+  fetchEtfHoldingsFromFmp,
+  normalizeFmpHoldingsToMap,
+  type FetchLike as FmpFetchLike,
+} from "@/src/lib/fmp-api";
 
 /**
- * Longview Research Partners publishes EBI's full daily holdings as an HTML
- * table on the fund page (the old /charts/ "Download PDF" flow now redirects
- * here). Fetching and parsing it directly replaces the Hyperbrowser agent,
- * which regularly hung past the 300s function limit.
+ * EBI holdings sources, in order of preference:
+ *
+ * 1. FMP `etf-holder/EBI` — the same API (and key) used for the baseline ETFs.
+ *    Structured JSON with 3-decimal weights; same daily snapshot Longview shows.
+ * 2. Longview's fund page, which renders the full holdings table as HTML
+ *    (its "Download CSV" button is built client-side from those rows; the
+ *    site's REST APIs require a login). Used automatically if FMP fails.
+ *
+ * Both replace the old Hyperbrowser agent, which clicked a "Download PDF"
+ * button that no longer exists and hung past the 300s function limit.
  */
 export const EBI_FUND_DATA_URL =
   "https://longviewresearchpartners.com/ebi/fund-data/";
@@ -111,12 +122,70 @@ export function parseEbiHoldingsHtml(html: string): ParsedEbiHoldings {
   return { asOfDate, holdings };
 }
 
-/** Fetches and validates the current EBI holdings. Throws on anything suspicious. */
+export type EbiHoldingsSource = "fmp" | "longview-html";
+
+export type EbiHoldings = HoldingsData & {
+  asOfDate: string | null;
+  source: EbiHoldingsSource;
+};
+
+function assertEnoughHoldings(count: number, where: string): void {
+  if (count < MIN_EXPECTED_HOLDINGS) {
+    throw new Error(
+      `Got only ${count} EBI holdings from ${where} (expected ≥ ${MIN_EXPECTED_HOLDINGS})`
+    );
+  }
+}
+
+/** EBI holdings from FMP. Throws if the response looks incomplete. */
+export async function fetchEbiHoldingsFromFmp(opts?: {
+  apiKey?: string;
+  fetchImpl?: FmpFetchLike;
+}): Promise<EbiHoldings> {
+  const raw = await fetchEtfHoldingsFromFmp("EBI", opts);
+  const holdings = normalizeFmpHoldingsToMap("EBI", raw);
+  assertEnoughHoldings(Object.keys(holdings).length, "FMP etf-holder/EBI");
+
+  const updated = raw
+    .map((h) => h.updated?.slice(0, 10))
+    .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort()
+    .at(-1);
+
+  return {
+    etfSymbol: "EBI",
+    lastUpdated: updated
+      ? new Date(`${updated}T00:00:00Z`).toISOString()
+      : new Date().toISOString(),
+    asOfDate: updated ?? null,
+    source: "fmp",
+    holdings,
+  };
+}
+
+/**
+ * Tries FMP first, then the Longview page. `primaryError` is set when the
+ * fallback was used so callers can alert on the degraded source.
+ */
+export async function fetchEbiHoldingsWithFallback(opts?: {
+  fmp?: Parameters<typeof fetchEbiHoldingsFromFmp>[0];
+  longview?: Parameters<typeof fetchEbiHoldings>[0];
+}): Promise<EbiHoldings & { primaryError?: unknown }> {
+  try {
+    return await fetchEbiHoldingsFromFmp(opts?.fmp);
+  } catch (primaryError) {
+    console.warn("FMP EBI holdings failed; falling back to Longview page:", primaryError);
+    const fallback = await fetchEbiHoldings(opts?.longview);
+    return { ...fallback, primaryError };
+  }
+}
+
+/** EBI holdings parsed from Longview's fund page. Throws on anything suspicious. */
 export async function fetchEbiHoldings(opts?: {
   url?: string;
   fetchImpl?: FetchLike;
   timeoutMs?: number;
-}): Promise<HoldingsData & { asOfDate: string | null }> {
+}): Promise<EbiHoldings> {
   const url = opts?.url ?? EBI_FUND_DATA_URL;
   const fetchImpl = opts?.fetchImpl ?? fetch;
 
@@ -130,12 +199,10 @@ export async function fetchEbiHoldings(opts?: {
   }
 
   const { asOfDate, holdings } = parseEbiHoldingsHtml(await res.text());
-  const count = Object.keys(holdings).length;
-  if (count < MIN_EXPECTED_HOLDINGS) {
-    throw new Error(
-      `Parsed only ${count} EBI holdings from ${url} (expected ≥ ${MIN_EXPECTED_HOLDINGS}); the page layout may have changed`
-    );
-  }
+  assertEnoughHoldings(
+    Object.keys(holdings).length,
+    `${url} (the page layout may have changed)`
+  );
 
   return {
     etfSymbol: "EBI",
@@ -143,6 +210,7 @@ export async function fetchEbiHoldings(opts?: {
       ? new Date(`${asOfDate}T00:00:00Z`).toISOString()
       : new Date().toISOString(),
     asOfDate,
+    source: "longview-html",
     holdings,
   };
 }
